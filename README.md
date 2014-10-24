@@ -307,7 +307,7 @@ These other defects were caused by the hard upper limit on bitrate. To correctly
 
 Additionally, even a CRF value of `18` wasn't high enough quality. Bitrates were too low in some cases, which didn't cause defects so much as a loss of detail when compared to the original.
 
-### How the _modified_ constrained variable bitrate (CVBR) mode works
+### How _modified_ constrained variable bitrate (CVBR) mode works
 
 Current versions of `transcode-video.sh` modify CVBR mode to impose a minimum quality threshold so that x264 is allowed to exceed bitrate limits to maintain that quality level. This new constraint is simply a maximum CRF value of `25`. Additionally, the target CRF value has been lowered to `16`.
 
