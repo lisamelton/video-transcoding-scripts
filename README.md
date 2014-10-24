@@ -349,7 +349,7 @@ Input resolution | Target video bitrate with `--big`
 
 For audio input, the change via `--big` is the same as using `--ac3 640`. Obviously this means there's no impact on the output bitrate of mono and stereo AAC audio tracks.
 
-Input channels | Pass through with `--big` | AAC track with `--big` | AC-3 track with `--big`
+Input channels | Pass through<br />with `--big` | AAC track<br />with `--big` | AC-3 track<br />with `--big`
 --- | --- | --- | ---
 Mono | AAC only | 80 Kbps | none
 Stereo | AAC only | 160 Kbps | none
