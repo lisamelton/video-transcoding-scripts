@@ -528,6 +528,10 @@ And the contents of `queue.txt` is just the list of movies, full paths without q
 
 Notice that there's no crop file for `/path/to/Another Movie.mkv`. This is because it doesn't require cropping.
 
+For other options that won't change from input to input, e.g. `--mkv`, simply augment the line in the script calling `transcode-video.sh`:
+
+        transcode-video.sh --mkv $crop_option "$input"
+
 The transcoding process is started by executing the script:
 
     ./batch.sh
