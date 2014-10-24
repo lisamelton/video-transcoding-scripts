@@ -536,7 +536,7 @@ The path is first deleted from the `queue.txt` file and then passed as an argume
 
 ## Feedback
 
-The best way to send feedback is mentioning me, [@donmelton](https://twitter.com/donmelton), on Twitter. I always try to repsond quickly but sometimes it may take as long as 24 hours.
+The best way to send feedback is mentioning me, [@donmelton](https://twitter.com/donmelton), on Twitter. I always try to respond quickly but sometimes it may take as long as 24 hours.
 
 ## Acknowledgements
 
