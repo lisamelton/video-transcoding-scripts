@@ -77,7 +77,7 @@ And sometimes HandBrake only crops a few pixels from one or more edges, which is
 
 This is why `transcode-video.sh` doesn't allow HandBrake to apply cropping by default.
 
-Instead, the `detect-crop.sh` script leverages both HandBrake and MPlayer, with some additional metrics, to find the optimal video cropping bounds. It then indicates whether those two programs agree. To aid in review, this script prints commands to the terminal console allowing the recommended (or disputed) crop to be displayed, as well as sample command lines for `transcode-video.sh` itself. And it's this easy to use:
+Instead, the `detect-crop.sh` script leverages both HandBrake and MPlayer, with additional measurements and constraints, to find the optimal video cropping bounds. It then indicates whether those two programs agree. To aid in review, this script prints commands to the terminal console allowing the recommended (or disputed) crop to be displayed, as well as sample command lines for `transcode-video.sh` itself. And it's this easy to use:
 
     detect-crop.sh "/path/to/Movie.mkv"
 
