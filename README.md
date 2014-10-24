@@ -544,6 +544,8 @@ A big "thank you" to the developers of HandBrake and the other tools used by the
 
 Thanks to [Rene Ritchie](https://twitter.com/reneritchie) for letting me continue to babble on about transcoding in his podcasts.
 
+Thanks to [Joyce Melton](https://twitter.com/erinhalfelven), my sister, for help editing this massive "README" document.
+
 Many thanks to [Jordan Breeding](https://twitter.com/jorbsd) and numerous others online for their positive feedback, bug reports and useful suggestions.
 
 ## License
