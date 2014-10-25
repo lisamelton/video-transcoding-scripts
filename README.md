@@ -136,11 +136,11 @@ This script requires a properly organized file, in either format, with compatibl
 
 All of these scripts work on OS X because that's the platform where I develop, test and use them. But none of them actually require OS X so, technically, they should also work on Windows and Linux. Your mileage may vary.
 
-Since these scripts are essentially intelligent wrappers around other software, they do require certain command line tools to function. Most of these dependencies are available via [Homebrew](http://brew.sh/), a package manager for OS X. However, HandBrake must be downloaded and installed manually.
+Since these scripts are essentially intelligent wrappers around other software, they do require certain command line tools to function. These dependencies are available via [Homebrew](http://brew.sh/), a package manager for OS X. HandBrake can be installed with [Homebrew-Cask](https://github.com/caskroom/homebrew-cask).
 
 Command line tool | `transcode-video.sh` | `detect-crop.sh` | `convert-video.sh` | Homebrew package
 --- | --- | --- | --- | ---
-`HandBrakeCLI` | required | required | | not available
+`HandBrakeCLI` | required | required | | (homebrew-cask) `handbrakecli`
 `mkvpropedit` | required | | | `mkvtoolnix`
 `mplayer` | | required | | `mplayer`
 `mkvmerge` | | | required | `mkvtoolnix`
@@ -151,17 +151,16 @@ Installing a package with Homebrew is as simple as:
 
     brew install mkvtoolnix
 
-You can find the official release of `HandBrakeCLI`, the command line version of HandBrake, here:
+For `HandBrakeCLI`, you need to install Homebrew-Cask first, which will create a new [tap](https://github.com/Homebrew/homebrew/wiki/brew-tap):
 
-<https://handbrake.fr/downloads.php>
+    brew install caskroom/cask/brew-cask
+    brew cask install handbrakecli
 
-But that version may contain out-of-date libraries since the HandBrake team only does an official release about once a year. Nightly builds of HandBrake are much more up to date and usually very stable. You can find a nightly build of `HandBrakeCLI` here:
+But that version may contain out-of-date libraries since the HandBrake team only does an official release about once a year. Nightly builds of HandBrake are much more up to date and usually very stable. You can install a nightly build of `HandBrakeCLI` with (after installing Homebrew-Cask):
 
-<https://handbrake.fr/nightly.php>
+    brew cask install caskroom/versions/handbrakecli-nightly
 
-Whichever version you choose, make sure you download a disk image file containing the command line tool `HandBrakeCLI`, and not just the `HandBrake` application. Disk images containing `HandBrakeCLI` have "CLI" in the filename.
-
-Open the disk image and then copy `HandBrakeCLI` to a directory listed in your `PATH` environment variable such as `/usr/local/bin`.
+These will download `HandBrakeCLI` to `/usr/local/bin` by default. [You can change it](https://github.com/caskroom/homebrew-cask/blob/master/USAGE.md#options) with the `--binarydir` flag, but make sure you chose somewhere in your `PATH` environment variable.
 
 ## Installation
 
