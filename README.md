@@ -404,11 +404,11 @@ When the output video bitrate is not below or near the target using `medium`, ap
 
 These slower presets can also improve quality, but the benefit compared to `medium` may not be perceptible for most input.
 
-The `slower`, `veryslow` and `placebo` presets are modified in `transcode-video.sh` to maintain compatibility with devices from Apple and other manufacturers. This is done by limiting the number of [reference frames](https://en.wikipedia.org/wiki/Reference_frame_(video)) to five.
+The `slower`, `veryslow` and `placebo` presets are modified in `transcode-video.sh` to maintain compatibility with devices from Apple and other manufacturers. When using these presets for output larger than `1280x720` pixels, the [H.264 level](https://en.wikipedia.org/wiki/H.264/MPEG-4_AVC#Levels) is constrained to `4.0`, usually limiting the number of [reference frames](https://en.wikipedia.org/wiki/Reference_frame_(video)).
 
 Avoid using `placebo` because it's simply not worth the time and may not even produce smaller output than `veryslow`. There's a reason this particular preset doesn't follow the nomenclature.
 
-To produce output even closer in configuration to what's available from the iTunes Store (i.e. with five reference frames), you need to use at least the `slow` preset. And for a very few number of videos, you may need to use `slower` or `veryslow` to reach the same level of compression.
+To produce output even closer in configuration to what's available from the iTunes Store, you need to use at least the `slow` preset. And for a very few number of videos, you may need to use `slower` or `veryslow` to reach the same level of compression.
 
 Always use the slowest preset that you can afford in terms of time. That's `medium` for most people with desktop-class machines, which is another reason it's the default.
 

@@ -7,7 +7,7 @@
 
 about() {
     cat <<EOF
-$program 4.0 of October 23, 2014
+$program 4.1 of October 27, 2014
 Copyright (c) 2013-2014 Don Melton
 EOF
     exit 0
@@ -616,14 +616,6 @@ if (($width > 1280)) || (($height > 720)); then
 
         case $preset in
             slow|slower|veryslow|placebo)
-                # Force H.264 level to 4.0 when using 5 reference frames.
-                # Which causes HandBrakeCLI to emit this message:
-                #
-                #   x264 [warning]: DPB size (5 frames, 39000 mbs) > level limit (4 frames, 32768 mbs)
-                #
-                # ...but it can be ignored since the VBV maximum rate is
-                # usually low.
-                #
                 level='4.0'
                 ;;
         esac
@@ -939,7 +931,7 @@ if [ "$max_rate_factor" ]; then
 fi
 
 if [ "$level" ]; then
-    encoder_options="$encoder_options:level=$level"
+    level_options="--h264-level $level"
 fi
 
 if [ "$extra_encoder_options" ]; then
@@ -953,6 +945,7 @@ if [ "$debug" ]; then
     echo "preset_options            = $preset_options" >&2
     echo "tune_options              = $tune_options" >&2
     echo "encoder_options           = $encoder_options" >&2
+    echo "level_options             = $level_options" >&2
     echo "rate_factor               = $rate_factor" >&2
     echo "frame_rate_options        = $frame_rate_options" >&2
     echo "audio_options             = $audio_options" >&2
@@ -980,6 +973,7 @@ time {
         $preset_options \
         $tune_options \
         --encopts $encoder_options \
+        $level_options \
         --quality $rate_factor \
         $frame_rate_options \
         $audio_options "$audio_track_name_list" \
