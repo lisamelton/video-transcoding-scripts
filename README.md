@@ -136,26 +136,43 @@ This script requires a properly organized file, in either format, with compatibl
 
 All of these scripts work on OS X because that's the platform where I develop, test and use them. But none of them actually require OS X so, technically, they should also work on Windows and Linux. Your mileage may vary.
 
-Since these scripts are essentially intelligent wrappers around other software, they do require certain command line tools to function. Most of these dependencies are available via [Homebrew](http://brew.sh/), a package manager for OS X. However, HandBrake must be downloaded and installed manually.
 
-Command line tool | `transcode-video.sh` | `detect-crop.sh` | `convert-video.sh` | Homebrew package
---- | --- | --- | --- | ---
-`HandBrakeCLI` | required | required | | not available
-`mkvpropedit` | required | | | `mkvtoolnix`
-`mplayer` | | required | | `mplayer`
-`mkvmerge` | | | required | `mkvtoolnix`
-`ffmpeg` | | | required | `ffmpeg`
-`mp4track` | | | required | `mp4v2`
+Since these scripts are essentially intelligent wrappers around other software, they do require certain command line tools to function. Most of these dependencies are available via [Homebrew](http://brew.sh/), a package manager for OS X. However, HandBrake is available via [Homebrew Cask](http://caskroom.io/), an extension to Homebrew.
+
+HandBrake can also be downloaded and installed manually.
+
+Tool | Transcoding | Crop detection | Conversion | Package | Cask
+--- | --- | --- | --- | --- | ---
+`HandBrakeCLI` | required | required | | | handbrakecli
+`mkvpropedit` | required | | | `mkvtoolnix` | &nbsp;
+`mplayer` | | required | | `mplayer` | &nbsp;
+`mkvmerge` | | | required | `mkvtoolnix` | &nbsp;
+`ffmpeg` | | | required | `ffmpeg` | &nbsp;
+`mp4track` | | | required | `mp4v2` | &nbsp;
 
 Installing a package with Homebrew is as simple as:
 
     brew install mkvtoolnix
 
-You can find the official release of `HandBrakeCLI`, the command line version of HandBrake, here:
+To install both Homebrew Cask and `HandBrakeCLI`, the command line version of HandBrake:
+
+    brew install caskroom/cask/brew-cask
+    brew cask install handbrakecli
+
+But that version of HandBrake may contain out-of-date libraries since the development team only does an official release about once a year. Nightly builds of HandBrake are much more up to date and usually very stable.
+
+To install both Homebrew Cask and a nightly build of `HandBrakeCLI`:
+
+    brew install caskroom/cask/brew-cask
+    brew cask install caskroom/versions/handbrakecli-nightly
+
+### Downloading and installing HandBrake manually
+
+You can find the official release of `HandBrakeCLI` here:
 
 <https://handbrake.fr/downloads.php>
 
-But that version may contain out-of-date libraries since the HandBrake team only does an official release about once a year. Nightly builds of HandBrake are much more up to date and usually very stable. You can find a nightly build of `HandBrakeCLI` here:
+Or a nightly build of `HandBrakeCLI` here:
 
 <https://handbrake.fr/nightly.php>
 
