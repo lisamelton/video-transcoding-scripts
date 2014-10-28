@@ -143,7 +143,7 @@ HandBrake can also be downloaded and installed manually.
 
 Tool | Transcoding | Crop detection | Conversion | Package | Cask
 --- | --- | --- | --- | --- | ---
-`HandBrakeCLI` | required | required | | | handbrakecli
+`HandBrakeCLI` | required | required | | | `handbrakecli`
 `mkvpropedit` | required | | | `mkvtoolnix` | &nbsp;
 `mplayer` | | required | | `mplayer` | &nbsp;
 `mkvmerge` | | | required | `mkvtoolnix` | &nbsp;
