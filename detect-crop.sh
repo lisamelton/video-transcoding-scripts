@@ -7,7 +7,7 @@
 
 about() {
     cat <<EOF
-$program 3.0 of October 23, 2014
+$program 3.1 of October 29, 2014
 Copyright (c) 2013-2014 Don Melton
 EOF
     exit 0
@@ -72,12 +72,14 @@ calculate_crop() {
 
         if (($delta_x && ($delta_x < $min_crop))); then
             crop_width="$width"
+            crop_x='0'
         fi
 
         delta_y="$(($height - $crop_height))"
 
         if (($delta_y && ($delta_y < $min_crop))); then
             crop_height="$height"
+            crop_y='0'
         fi
     fi
 
