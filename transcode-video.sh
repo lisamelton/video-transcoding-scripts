@@ -7,7 +7,7 @@
 
 about() {
     cat <<EOF
-$program 4.1 of October 27, 2014
+$program 4.2 of November 12, 2014
 Copyright (c) 2013-2014 Don Melton
 EOF
     exit 0
@@ -199,7 +199,7 @@ rate_factor='16'
 max_rate_factor='25'
 constrain_to_1280x720=''
 frame_rate_options=''
-audio_track='1'
+audio_track=''
 extra_audio_track_list=''
 extra_audio_track_name_list=''
 ac3_bitrate='384'
@@ -723,115 +723,131 @@ readonly all_audio_tracks_info="$(echo "$media_info" |
     sed -n '/^  + audio tracks:$/,/^  + subtitle tracks:$/p' |
     sed -n '/^    + /p')"
 
-if [ ! "$all_audio_tracks_info" ]; then
-    die "no audio track information in: $input"
-fi
+if [ "$all_audio_tracks_info" ]; then
 
-readonly audio_track_info="$(echo "$all_audio_tracks_info" | sed -n ${audio_track}p)"
-
-if [ ! "$audio_track_info" ]; then
-    die "\`audio $audio_track\` track not found in: $input"
-fi
-
-audio_track_channels="$(echo "$audio_track_info" |
-    sed -n 's/^[^(]\{1,\} ([^(]\{1,\}) (\([^(]\{1,\}\)) .*$/\1/p' |
-    sed 's/ ch$//')"
-
-case $audio_track_channels in
-    'Dolby Surround')
-        audio_track_channels='2'
-        ;;
-    [0-9]*)
-        high_channels="$(echo "$audio_track_channels" | sed 's/\.[0-9]\{1,\}$//')"
-        low_channels="$(echo "$audio_track_channels" | sed 's/^[0-9]\{1,\}\.//')"
-
-        if [ "$high_channels" ] && [ "$low_channels" ]; then
-            audio_track_channels="$((high_channels + low_channels))"
-        fi
-        ;;
-    *)
-        die "bad audio channel information in: $input"
-        ;;
-esac
-
-if [ ! "$audio_track_channels" ]; then
-    die "no audio channel information in: $input"
-fi
-
-# For MP4 output, transcode audio input first into Advanced Audio Coding (AAC)
-# format. Add second audio track in Dolby Digital (AC-3) format if audio input
-# is multi-channel.
-#
-# Handle MKV output like MP4, but place any AC-3 format track first.
-#
-# Transcode stereo or mono audio using `HandBrakeCLI` default behavior, at 160
-# or 80 kbps in AAC format. Use existing audio if already in that format.
-#
-# Transcode multi-channel audio input in AC-3 format. Use existing audio if
-# already in that format. Allow user to disable AC-3 format output, change
-# bitrate, or allow larger input bitrate to pass through without transcoding.
-#
-audio_track_list="$audio_track"
-audio_track_name_list=''
-
-if [ "$ac3_bitrate" ] && (($audio_track_channels > 2)); then
-    audio_track_list="$audio_track,$audio_track"
-    audio_track_name_list=','
-
-    readonly help="$(HandBrakeCLI --help 2>/dev/null)"
-
-    if $(echo "$help" | grep -q ca_aac); then
-        aac_encoder='ca_aac'
-
-    elif $(echo "$help" | grep -q av_aac); then
-        aac_encoder='av_aac'
-
-    elif $(echo "$help" | grep -q ffaac); then
-        aac_encoder='ffaac'
-    else
-        aac_encoder='faac'
+    if [ ! "$audio_track" ]; then
+        audio_track='1'
     fi
 
-    if $(echo "$help" | grep -q ffac3); then
-        ac3_encoder='ffac3'
-    else
-        ac3_encoder='ac3'
+    readonly audio_track_info="$(echo "$all_audio_tracks_info" | sed -n ${audio_track}p)"
+
+    if [ ! "$audio_track_info" ]; then
+        die "\`audio $audio_track\` track not found in: $input"
     fi
 
-    readonly audio_track_bitrate="$(echo "$audio_track_info" | sed -n 's/^.* \([0-9]\{1,\}\)bps$/\1/p')"
+    audio_track_channels="$(echo "$audio_track_info" |
+        sed -n 's/^[^(]\{1,\} ([^(]\{1,\}) (\([^(]\{1,\}\)) .*$/\1/p' |
+        sed 's/ ch$//')"
 
-    if (($pass_ac3_bitrate < $ac3_bitrate)); then
-        pass_ac3_bitrate="$ac3_bitrate"
+    case $audio_track_channels in
+        'Dolby Surround')
+            audio_track_channels='2'
+            ;;
+        [0-9]*)
+            high_channels="$(echo "$audio_track_channels" | sed 's/\.[0-9]\{1,\}$//')"
+            low_channels="$(echo "$audio_track_channels" | sed 's/^[0-9]\{1,\}\.//')"
+
+            if [ "$high_channels" ] && [ "$low_channels" ]; then
+                audio_track_channels="$((high_channels + low_channels))"
+            fi
+            ;;
+        *)
+            die "bad audio channel information in: $input"
+            ;;
+    esac
+
+    if [ ! "$audio_track_channels" ]; then
+        die "no audio channel information in: $input"
     fi
 
-    if [[ "$audio_track_info" =~ '(AC3)' ]] && ((($audio_track_bitrate / 1000) <= $pass_ac3_bitrate)); then
+    # For MP4 output, transcode audio input first into Advanced Audio Coding
+    # (AAC) format. Add second audio track in Dolby Digital (AC-3) format if
+    # audio input is multi-channel.
+    #
+    # Handle MKV output like MP4, but place any AC-3 format track first.
+    #
+    # Transcode stereo or mono audio using `HandBrakeCLI` default behavior, at
+    # 160 or 80 kbps in AAC format. Use existing audio if already in that
+    # format.
+    #
+    # Transcode multi-channel audio input in AC-3 format. Use existing audio
+    # if already in that format. Allow user to disable AC-3 format output,
+    # change bitrate, or allow larger input bitrate to pass through without
+    # transcoding.
+    #
+    audio_track_list="$audio_track"
+    audio_track_name_list=''
 
-        if [ "$container_format" == 'mkv' ]; then
-            audio_options="--aencoder copy:ac3,$aac_encoder"
+    if [ "$ac3_bitrate" ] && (($audio_track_channels > 2)); then
+        audio_track_list="$audio_track,$audio_track"
+        audio_track_name_list=','
+
+        readonly help="$(HandBrakeCLI --help 2>/dev/null)"
+
+        if $(echo "$help" | grep -q ca_aac); then
+            aac_encoder='ca_aac'
+
+        elif $(echo "$help" | grep -q av_aac); then
+            aac_encoder='av_aac'
+
+        elif $(echo "$help" | grep -q ffaac); then
+            aac_encoder='ffaac'
         else
-            audio_options="--aencoder $aac_encoder,copy:ac3"
+            aac_encoder='faac'
         fi
 
-    elif [ "$container_format" == 'mkv' ]; then
-        audio_options="--aencoder $ac3_encoder,$aac_encoder --ab $ac3_bitrate,"
+        if $(echo "$help" | grep -q ffac3); then
+            ac3_encoder='ffac3'
+        else
+            ac3_encoder='ac3'
+        fi
+
+        readonly audio_track_bitrate="$(echo "$audio_track_info" | sed -n 's/^.* \([0-9]\{1,\}\)bps$/\1/p')"
+
+        if (($pass_ac3_bitrate < $ac3_bitrate)); then
+            pass_ac3_bitrate="$ac3_bitrate"
+        fi
+
+        if [[ "$audio_track_info" =~ '(AC3)' ]] && ((($audio_track_bitrate / 1000) <= $pass_ac3_bitrate)); then
+
+            if [ "$container_format" == 'mkv' ]; then
+                audio_options="--aencoder copy:ac3,$aac_encoder"
+            else
+                audio_options="--aencoder $aac_encoder,copy:ac3"
+            fi
+
+        elif [ "$container_format" == 'mkv' ]; then
+            audio_options="--aencoder $ac3_encoder,$aac_encoder --ab $ac3_bitrate,"
+        else
+            audio_options="--aencoder $aac_encoder,$ac3_encoder --ab ,$ac3_bitrate"
+        fi
+
+    elif [[ "$audio_track_info" =~ '(AAC)' ]] || [[ "$audio_track_info" =~ '(aac)' ]]; then
+        audio_options='--aencoder copy:aac'
     else
-        audio_options="--aencoder $aac_encoder,$ac3_encoder --ab ,$ac3_bitrate"
+        audio_options=''
     fi
 
-elif [[ "$audio_track_info" =~ '(aac)' ]]; then
-    audio_options='--aencoder copy:aac'
+    if [ "$extra_audio_track_list" ]; then
+        audio_options="--audio ${audio_track_list}$extra_audio_track_list $audio_options --aname"
+        audio_track_name_list="${audio_track_name_list}$extra_audio_track_name_list"
+    else
+        if (($audio_track > 1)); then
+            audio_options="--audio $audio_track $audio_options"
+        fi
+
+        audio_track_name_list=''
+    fi
 else
+    if [ "$audio_track" ]; then
+        die "\`audio $audio_track\` track not found in: $input"
+    fi
+
+    if [ "$extra_audio_track_list" ]; then
+        die "no audio tracks in: $input"
+    fi
+
     audio_options=''
-fi
-
-if [ "$extra_audio_track_list" ]; then
-    audio_options="--audio ${audio_track_list}$extra_audio_track_list $audio_options --aname"
-    audio_track_name_list="${audio_track_name_list}$extra_audio_track_name_list"
-else
-    if (($audio_track > 1)); then
-        audio_options="--audio $audio_track $audio_options"
-    fi
-
     audio_track_name_list=''
 fi
 
@@ -856,21 +872,18 @@ if [ "$auto_burn" ] && [ -f "$input" ]; then
     readonly raw_subtitle_tracks_info="$(echo "$media_info" | sed -n '/^    Stream #[^:]\{1,\}: Subtitle: /p')"
 
     if [ "$raw_subtitle_tracks_info" ]; then
-        readonly raw_subtitle_tracks_count="$(echo "$raw_subtitle_tracks_info" | wc -l | sed 's/ //g')"
+        readonly subtitle_tracks_count="$(echo "$all_subtitle_tracks_info" | wc -l | sed 's/ //g')"
+        index='1'
 
-        if [ "$raw_subtitle_tracks_count" == "$(echo "$all_subtitle_tracks_info" | wc -l | sed 's/ //g')" ]; then
-            index='1'
+        while ((index <= $subtitle_tracks_count)); do
 
-            while ((index <= $raw_subtitle_tracks_count)); do
+            if [[ "$(echo "$raw_subtitle_tracks_info" | sed -n ${index}p)" =~ '(forced)' ]]; then
+                subtitle_track="$index"
+                break
+            fi
 
-                if [[ "$(echo "$raw_subtitle_tracks_info" | sed -n ${index}p)" =~ '(forced)' ]]; then
-                    subtitle_track="$index"
-                    break
-                fi
-
-                index="$((index + 1))"
-            done
-        fi
+            index="$((index + 1))"
+        done
     fi
 fi
 
