@@ -7,7 +7,7 @@
 
 about() {
     cat <<EOF
-$program 4.2 of November 12, 2014
+$program 4.3 of November 16, 2014
 Copyright (c) 2013-2014 Don Melton
 EOF
     exit 0
@@ -87,6 +87,8 @@ Video options:
                         (use \`detect-crop.sh\` script for optimal bounds)
                         (use \`--crop auto\` for \`HandBrakeCLI\` behavior)
     --720p          constrain video to fit within 1280x720 pixel bounds
+    --1080p             "       "   "   "    "    1920x1080  "     "
+    --2160p             "       "   "   "    "    3840x2160  "     "
     --rate FPS      force video frame rate (default: based on input)
 
 Audio options:
@@ -98,6 +100,10 @@ Audio options:
     --pass-ac3 BITRATE
                     set passthru AC-3 audio <= 384|448|640 kbps (default: 448)
     --no-ac3        don't output multi-channel AC-3 audio
+    --with-original-audio [TRACK]
+                    try to include original audio along with transcoded track
+                        optionally identified by number
+                        (becomes default audio track if successful)
 
 Subtitle options:
     --burn TRACK    burn subtitle track identified by number
@@ -142,6 +148,8 @@ Passthru options:
                         (refer to \`HandBrakeCLI --help\` for more information)
 
 Other options:
+    --debug         output diagnostic information to \`stderr\` and exit
+                        (with \`HandBrakeCLI\` command line sent to \`stdout\`)
     --version       output version information and exit
 
 Requires \`HandBrakeCLI\` executable in \$PATH.
@@ -171,6 +179,10 @@ deprecated_and_replaced() {
     echo "$program: use this option instead: $2" >&2
 }
 
+escape_string() {
+    echo "$1" | sed "s/'/'\\\''/g;/ /s/^\(.*\)$/'\1'/"
+}
+
 readonly program="$(basename "$0")"
 
 case $1 in
@@ -197,14 +209,17 @@ vbv_bufsize=''
 extra_encoder_options=''
 rate_factor='16'
 max_rate_factor='25'
-constrain_to_1280x720=''
+constrain_width='4096'
+constrain_height='2304'
 frame_rate_options=''
 audio_track=''
 extra_audio_track_list=''
 extra_audio_track_name_list=''
 ac3_bitrate='384'
 pass_ac3_bitrate='448'
-crop_options='--crop 0:0:0:0'
+with_original_audio=''
+original_audio_track=''
+crop='0:0:0:0'
 filter_options=''
 auto_detelecine='yes'
 subtitle_track=''
@@ -216,6 +231,7 @@ srt_codeset_list=''
 srt_offset_list=''
 srt_lang_list=''
 tmp=''
+default_max_bitrate_2160p='10000'
 default_max_bitrate_1080p='5000'
 default_max_bitrate_720p='4000'
 default_max_bitrate_480p='2000'
@@ -310,7 +326,16 @@ while [ "$1" ]; do
             ;;
         --720p|--resize)
             [ "$1" == '--resize' ] && deprecated_and_replaced "$1" '--720p'
-            constrain_to_1280x720='yes'
+            constrain_width='1280'
+            constrain_height='720'
+            ;;
+        --1080p)
+            constrain_width='1920'
+            constrain_height='1080'
+            ;;
+        --2160p)
+            constrain_width='3840'
+            constrain_height='2160'
             ;;
         --rate)
             frame_rate_options="--rate $(printf '%.3f' "$2" | sed 's/0*$//;s/\.$//')"
@@ -369,15 +394,19 @@ while [ "$1" ]; do
             [ "$1" == '--no-surround' ] && deprecated_and_replaced "$1" '--no-ac3'
             ac3_bitrate=''
             ;;
+        --with-original-audio)
+            with_original_audio='yes'
+            original_audio_track="$(printf '%.0f' "$2" 2>/dev/null)"
+
+            if (($original_audio_track < 1)); then
+                original_audio_track=''
+            else
+                shift
+            fi
+            ;;
         --crop)
             crop="$2"
             shift
-
-            if [ "$crop" == 'auto' ]; then
-                crop_options=''
-            else
-                crop_options="--crop $crop"
-            fi
             ;;
         --filter)
             filter="$2"
@@ -481,6 +510,7 @@ while [ "$1" ]; do
             ;;
         --big|--better)
             [ "$1" == '--better' ] && deprecated_and_replaced "$1" '--big'
+            default_max_bitrate_2160p='16000'
             default_max_bitrate_1080p='8000'
             default_max_bitrate_720p='6000'
             default_max_bitrate_480p='3000'
@@ -584,8 +614,21 @@ if ((${#size_array[*]} != 2)); then
     die "no video size information in: $input"
 fi
 
-readonly width="${size_array[0]}"
-readonly height="${size_array[1]}"
+width="${size_array[0]}"
+height="${size_array[1]}"
+
+if [ "$crop" != '0:0:0:0' ] && [ "$crop" != 'auto' ]; then
+    readonly crop_array=($(echo "$crop" |
+        sed -n 's/^\([0-9]\{1,\}\):\([0-9]\{1,\}\):\([0-9]\{1,\}\):\([0-9]\{1,\}\)$/ \1 \2 \3 \4 /p' |
+        sed 's/ 0\([0-9]\)/ \1/g'))
+
+    width="$((width - ${crop_array[2]} - ${crop_array[3]}))"
+    height="$((height - ${crop_array[0]} - ${crop_array[1]}))"
+
+    if (($width < 1)) || (($height < 1)); then
+        die "invalid crop: $crop"
+    fi
+fi
 
 # Limit reference frames for playback compatibility with popular devices.
 #
@@ -599,31 +642,46 @@ case $preset in
 esac
 
 level=''
-size_options='--strict-anamorphic'
+
+if ((($width > $constrain_width)) || (($height > $constrain_height))); then
+    size_options="--maxWidth $constrain_width --maxHeight $constrain_height --loose-anamorphic"
+
+    adjusted_height="$(ruby -e 'printf "%.0f", '$height' * ('$constrain_width'.0 / '$width')')"
+    adjusted_height=$((adjusted_height - (adjusted_height % 2)))
+
+    if (($adjusted_height > $constrain_height)); then
+        width="$(ruby -e 'printf "%.0f", '$width' * ('$constrain_height'.0 / '$height')')"
+        width=$((width + (width % 2)))
+        height="$constrain_height"
+    else
+        width="$constrain_width"
+        height="$adjusted_height"
+    fi
+else
+    size_options='--strict-anamorphic'
+fi
 
 # Limit `x264` video buffer verifier (VBV) size to values appropriate for
 # H.264 level with High profile:
 #
-#   25000 for level 4.0 (e.g. Blu-ray input)
-#   17500 for level 3.1 (e.g. 720p input)
-#   12500 for level 3.0 (e.g. DVD input)
+#   300000 for level 5.1 (e.g. 2160p input)
+#    25000 for level 4.0 (e.g. Blu-ray input)
+#    17500 for level 3.1 (e.g. 720p input)
+#    12500 for level 3.0 (e.g. DVD input)
 #
-if (($width > 1280)) || (($height > 720)); then
+if (($width > 1920)) || (($height > 1080)); then
+    vbv_maxrate="$default_max_bitrate_2160p"
+    max_bufsize='300000'
 
-    if [ ! "$constrain_to_1280x720" ]; then
-        vbv_maxrate="$default_max_bitrate_1080p"
-        max_bufsize='25000'
+elif (($width > 1280)) || (($height > 720)); then
+    vbv_maxrate="$default_max_bitrate_1080p"
+    max_bufsize='25000'
 
-        case $preset in
-            slow|slower|veryslow|placebo)
-                level='4.0'
-                ;;
-        esac
-    else
-        vbv_maxrate="$default_max_bitrate_720p"
-        max_bufsize='17500'
-        size_options='--maxWidth 1280 --maxHeight 720 --loose-anamorphic'
-    fi
+    case $preset in
+        slow|slower|veryslow|placebo)
+            level='4.0'
+            ;;
+    esac
 
 elif (($width > 720)) || (($height > 576)); then
     vbv_maxrate="$default_max_bitrate_720p"
@@ -777,63 +835,98 @@ if [ "$all_audio_tracks_info" ]; then
     #
     audio_track_list="$audio_track"
     audio_track_name_list=''
+    audio_encoder_list=''
+    audio_bitrate_list=''
 
-    if [ "$ac3_bitrate" ] && (($audio_track_channels > 2)); then
-        audio_track_list="$audio_track,$audio_track"
-        audio_track_name_list=','
+    readonly help="$(HandBrakeCLI --help 2>/dev/null)"
 
-        readonly help="$(HandBrakeCLI --help 2>/dev/null)"
+    if $(echo "$help" | grep -q ca_aac); then
+        aac_encoder='ca_aac'
 
-        if $(echo "$help" | grep -q ca_aac); then
-            aac_encoder='ca_aac'
+    elif $(echo "$help" | grep -q av_aac); then
+        aac_encoder='av_aac'
 
-        elif $(echo "$help" | grep -q av_aac); then
-            aac_encoder='av_aac'
+    elif $(echo "$help" | grep -q ffaac); then
+        aac_encoder='ffaac'
+    else
+        aac_encoder='faac'
+    fi
 
-        elif $(echo "$help" | grep -q ffaac); then
-            aac_encoder='ffaac'
-        else
-            aac_encoder='faac'
-        fi
+    if (($audio_track_channels > 2)); then
 
-        if $(echo "$help" | grep -q ffac3); then
-            ac3_encoder='ffac3'
-        else
-            ac3_encoder='ac3'
-        fi
+        if [ "$ac3_bitrate" ]; then
+            audio_track_list="$audio_track,$audio_track"
+            audio_track_name_list=','
 
-        readonly audio_track_bitrate="$(echo "$audio_track_info" | sed -n 's/^.* \([0-9]\{1,\}\)bps$/\1/p')"
-
-        if (($pass_ac3_bitrate < $ac3_bitrate)); then
-            pass_ac3_bitrate="$ac3_bitrate"
-        fi
-
-        if [[ "$audio_track_info" =~ '(AC3)' ]] && ((($audio_track_bitrate / 1000) <= $pass_ac3_bitrate)); then
-
-            if [ "$container_format" == 'mkv' ]; then
-                audio_options="--aencoder copy:ac3,$aac_encoder"
+            if $(echo "$help" | grep -q ffac3); then
+                ac3_encoder='ffac3'
             else
-                audio_options="--aencoder $aac_encoder,copy:ac3"
+                ac3_encoder='ac3'
             fi
 
-        elif [ "$container_format" == 'mkv' ]; then
-            audio_options="--aencoder $ac3_encoder,$aac_encoder --ab $ac3_bitrate,"
-        else
-            audio_options="--aencoder $aac_encoder,$ac3_encoder --ab ,$ac3_bitrate"
+            readonly audio_track_bitrate="$(echo "$audio_track_info" | sed -n 's/^.* \([0-9]\{1,\}\)bps$/\1/p')"
+
+            if (($pass_ac3_bitrate < $ac3_bitrate)); then
+                pass_ac3_bitrate="$ac3_bitrate"
+            fi
+
+            if [[ "$audio_track_info" =~ '(AC3)' ]] && ((($audio_track_bitrate / 1000) <= $pass_ac3_bitrate)); then
+
+                if [ "$container_format" == 'mkv' ]; then
+                    audio_encoder_list="copy:ac3,$aac_encoder"
+                else
+                    audio_encoder_list="$aac_encoder,copy:ac3"
+                fi
+
+            elif [ "$container_format" == 'mkv' ]; then
+                audio_encoder_list="$ac3_encoder,$aac_encoder"
+                audio_bitrate_list="$ac3_bitrate,"
+            else
+                audio_encoder_list="$aac_encoder,$ac3_encoder"
+                audio_bitrate_list=",$ac3_bitrate"
+            fi
         fi
 
     elif [[ "$audio_track_info" =~ '(AAC)' ]] || [[ "$audio_track_info" =~ '(aac)' ]]; then
-        audio_options='--aencoder copy:aac'
-    else
-        audio_options=''
+        audio_encoder_list='copy:aac'
+    fi
+
+    if [ "$with_original_audio" ]; then
+
+        if [ ! "$original_audio_track" ]; then
+            original_audio_track="$audio_track"
+        fi
+
+        audio_track_list="$original_audio_track,$audio_track_list"
+        audio_track_name_list=",$audio_track_name_list"
+
+        if [ "$audio_encoder_list" ]; then
+            audio_encoder_list="copy,$audio_encoder_list"
+        else
+            audio_encoder_list="copy,$aac_encoder"
+        fi
+
+        if [ "$audio_bitrate_list" ]; then
+            audio_bitrate_list=",$audio_bitrate_list"
+        fi
+    fi
+
+    audio_options=''
+
+    if [ "$audio_encoder_list" ]; then
+        audio_options="--aencoder $audio_encoder_list"
+    fi
+
+    if [ "$audio_bitrate_list" ]; then
+        audio_options="$audio_options --ab $audio_bitrate_list"
     fi
 
     if [ "$extra_audio_track_list" ]; then
         audio_options="--audio ${audio_track_list}$extra_audio_track_list $audio_options --aname"
         audio_track_name_list="${audio_track_name_list}$extra_audio_track_name_list"
     else
-        if (($audio_track > 1)); then
-            audio_options="--audio $audio_track $audio_options"
+        if (($audio_track > 1)) || [ "$with_original_audio" ]; then
+            audio_options="--audio $audio_track_list $audio_options"
         fi
 
         audio_track_name_list=''
@@ -843,12 +936,18 @@ else
         die "\`audio $audio_track\` track not found in: $input"
     fi
 
-    if [ "$extra_audio_track_list" ]; then
+    if [ "$extra_audio_track_list" ] || [ "$with_original_audio" ]; then
         die "no audio tracks in: $input"
     fi
 
     audio_options=''
     audio_track_name_list=''
+fi
+
+if [ "$crop" == 'auto' ]; then
+    crop_options=''
+else
+    crop_options="--crop $crop"
 fi
 
 if [ "$auto_detelecine" ] && [[ "$frame_rate" =~ '29.97' ]]; then
@@ -952,6 +1051,7 @@ if [ "$extra_encoder_options" ]; then
 fi
 
 if [ "$debug" ]; then
+    echo >&2
     echo "title_options             = $title_options" >&2
     echo "chapters_options          = $chapters_options" >&2
     echo "container_format_options  = $container_format_options" >&2
@@ -971,6 +1071,22 @@ if [ "$debug" ]; then
     echo "passthru_options          = $passthru_options" >&2
     echo "input                     = $input" >&2
     echo "output                    = $output" >&2
+    echo >&2
+
+    command="$(echo "HandBrakeCLI $title_options $chapters_options --markers $container_format_options --encoder x264 $preset_options $tune_options --encopts $encoder_options $level_options --quality $rate_factor $frame_rate_options $audio_options" | sed 's/ *$//;s/ \{1,\}/ /g')"
+
+    if [ "$audio_track_name_list" ]; then
+        command="$command $(escape_string "$audio_track_name_list")"
+    fi
+
+    command="$command $(echo "$crop_options $size_options $filter_options $subtitle_options $srt_options $passthru_options" | sed 's/^ *//;s/ *$//;s/ \{1,\}/ /g') --input $(escape_string "$input") --output $(escape_string "$output") 2>&1 | tee -a $(escape_string "${output}.log")"
+
+    echo "$command"
+
+    if [ "$container_format" == 'mkv' ] && (($srt_forced_index > 0)); then
+        echo "[ -f $(escape_string "$output") ] && mkvpropedit --quiet --edit track:s$srt_forced_index --set flag-forced=1 $(escape_string "$output")"
+    fi
+
     exit
 fi
 
