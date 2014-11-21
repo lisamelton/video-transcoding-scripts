@@ -192,6 +192,10 @@ Or download them individually from the GitHub website here:
 
 <https://github.com/donmelton/video-transcoding-scripts>
 
+Make sure each script is executable by setting its permissions like this:
+
+    chmod +x transcode-video.sh
+
 And then copy the scripts to a directory listed in your `PATH` environment variable such as `/usr/local/bin`.
 
 ## Usage
