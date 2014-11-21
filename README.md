@@ -130,7 +130,7 @@ Which creates this Matroska file in the current working directory:
 
     Movie.mkv
 
-This script requires a properly organized file, in either format, with compatible video and audio tracks. All output video files from `transcode-video.sh` meet this criteria, but videos from other sources can sometimes fail. Subtitle tracks are not converted.
+This script requires a properly organized file, in either format, with compatible video and audio tracks. Most output video files from `transcode-video.sh` meet this criteria, but videos from other sources can sometimes fail. Subtitle tracks are not converted.
 
 ## Requirements
 
