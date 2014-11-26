@@ -7,7 +7,7 @@
 
 about() {
     cat <<EOF
-$program 4.3 of November 16, 2014
+$program 4.4 of November 25, 2014
 Copyright (c) 2013-2014 Don Melton
 EOF
     exit 0
@@ -180,7 +180,7 @@ deprecated_and_replaced() {
 }
 
 escape_string() {
-    echo "$1" | sed "s/'/'\\\''/g;/ /s/^\(.*\)$/'\1'/"
+    echo "$1" | sed "s/'/'\\\''/g;s/^\(.*\)$/'\1'/"
 }
 
 readonly program="$(basename "$0")"

@@ -7,7 +7,7 @@
 
 about() {
     cat <<EOF
-$program 3.1 of October 29, 2014
+$program 3.2 of November 25, 2014
 Copyright (c) 2013-2014 Don Melton
 EOF
     exit 0
@@ -104,7 +104,7 @@ calculate_crop() {
 }
 
 escape_string() {
-    echo "$1" | sed "s/'/'\\\''/g;/ /s/^\(.*\)$/'\1'/"
+    echo "$1" | sed "s/'/'\\\''/g;s/^\(.*\)$/'\1'/"
 }
 
 print_commands() {
