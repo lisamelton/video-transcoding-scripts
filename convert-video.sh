@@ -7,7 +7,7 @@
 
 about() {
     cat <<EOF
-$program 1.0 of October 23, 2014
+$program 2.0 of December 3, 2014
 Copyright (c) 2013-2014 Don Melton
 EOF
     exit 0
@@ -16,7 +16,7 @@ EOF
 usage() {
     cat <<EOF
 Convert video file from Matroska to MP4 format or from MP4 to Matroksa format
-WITHOUT TRANSCODING.
+WITHOUT TRANSCODING VIDEO.
 
 Usage: $program [OPTION]... [FILE]
 
@@ -68,8 +68,8 @@ for tool in mkvmerge ffmpeg mp4track; do
     fi
 done
 
-readonly identification="$(mkvmerge --identify "$input")"
-readonly input_container="$(echo "$identification" | sed -n 's/^File .*: container: //p')"
+readonly identification="$(mkvmerge --identify-verbose "$input")"
+readonly input_container="$(echo "$identification" | sed -n 's/^File .*: container: \(.*\) \[.*\]$/\1/p')"
 
 if [ ! "$input_container" ]; then
     die "unknown input container format: $input"
@@ -93,107 +93,166 @@ if [ -e "$output" ]; then
     die "output file already exists: $output"
 fi
 
-readonly track0="$(echo "$identification" | sed -n 's/^Track ID 0: //p')"
+video_track=''
+ac3_audio_track=''
+aac_audio_track=''
+extra_aac_audio_track_list=''
+other_audio_track=''
+index='0'
 
-if [ ! "$track0" ]; then
-    die "missing video track: $input"
-fi
+while read format; do
 
-# Require H.264 format video in first track.
-#
-if [ "$track0" != 'video (MPEG-4p10/AVC/h.264)' ]; then
-    die "expected H.264 format video in first track of input file: $input"
-fi
-
-readonly track1="$(echo "$identification" | sed -n 's/^Track ID 1: //p')"
-
-if [ ! "$track1" ]; then
-    die "missing audio track: $input"
-fi
-
-# Require Dolby Digital (AC-3) or Advanced Audio Coding (AAC) format audio in
-# second track.
-#
-if [ "$track1" != 'audio (AC3/EAC3)' ] && [ "$track1" != 'audio (AAC)' ]; then
-    die "expected AC-3 or AAC format audio in second track of input file: $input"
-fi
-
-last_audio_track_index='1'
-
-readonly track2="$(echo "$identification" | sed -n 's/^Track ID 2: //p')"
-
-if [ "$input_container" == 'Matroska' ]; then
-
-    if [ "$track1" == 'audio (AC3/EAC3)' ] && [ "$track2" == 'audio (AAC)' ]; then
-        last_audio_track_index='2'
-        map_options='-map 0:2 -map 0:1'
-        adjust_enabled='true'
-    else
-        map_options='-map 0:1'
-        adjust_enabled=''
-    fi
-else
-    if [ "$track1" == 'audio (AAC)' ] && [ "$track2" == 'audio (AC3/EAC3)' ]; then
-        last_audio_track_index='2'
-        track_order='0:0,0:2,0:1'
-        audio_tracks='2,1'
-    else
-        track_order='0:0,0:1'
-        audio_tracks='1'
-    fi
-fi
-
-index="$((last_audio_track_index + 1))"
-
-while : ; do
-    track="$(echo "$identification" | sed -n 's/^Track ID '$index': //p')"
-
-    if [ "$track" != 'audio (AAC)' ]; then
-        break
+    if [ ! "$video_track" ] && [ "$format" == 'video (MPEG-4p10/AVC/h.264)' ]; then
+        video_track="$index"
     fi
 
-    if [ "$input_container" == 'Matroska' ]; then
-        map_options="$map_options -map 0:$index"
-    else
-        track_order="$track_order,0:$index"
-        audio_tracks="$audio_tracks,$index"
+    if [[ "$format" =~ ^'audio ' ]]; then
+
+        case $format in
+            'audio (AC3/EAC3)')
+
+                if [ ! "$ac3_audio_track" ] && [ ! "$other_audio_track" ]; then
+                    ac3_audio_track="$index"
+                fi
+                ;;
+            'audio (AAC)')
+
+                if [ ! "$other_audio_track" ]; then
+
+                    if [ ! "$aac_audio_track" ]; then
+                        aac_audio_track="$index"
+                    else
+                        extra_aac_audio_track_list="$extra_aac_audio_track_list,$index"
+                    fi
+                fi
+                ;;
+            *)
+                if [ "$input_container" == 'Matroska' ] && [ ! "$other_audio_track" ] && [ ! "$ac3_audio_track" ] && [ ! "$aac_audio_track" ]; then
+                    other_audio_track="$index"
+                fi
+                ;;
+        esac
     fi
 
     index="$((index + 1))"
-done
+
+done < <(echo "$identification" | sed -n '/^Track ID /s/^Track ID [0-9]\{1,\}: \(.*\) \[.*\]$/\1/p')
+
+if [ ! "$video_track" ]; then
+    die "missing H.264 format video track: $input"
+fi
 
 if [ "$input_container" == 'Matroska' ]; then
+    map_options="-map 0:$video_track"
+    codec_options='-c copy'
+
+    if [ "$aac_audio_track" ]; then
+        map_options="$map_options -map 0:$aac_audio_track"
+    fi
+
+    if $(ffmpeg -version | grep enable-libfdk-aac >/dev/null); then
+        aac_encoder='libfdk_aac'
+    else
+        aac_encoder='libfaac'
+    fi
+
+    if [ "$ac3_audio_track" ]; then
+        map_options="$map_options -map 0:$ac3_audio_track"
+
+        if [ ! "$aac_audio_track" ]; then
+            map_options="$map_options -map 0:$ac3_audio_track"
+            codec_options="-c:v copy -ac 2 -c:a:0 $aac_encoder -b:a:0 160k -c:a:1 copy"
+        fi
+    fi
+
+    if [ "$extra_aac_audio_track_list" ]; then
+        map_options="$map_options$(echo "$extra_aac_audio_track_list" | sed 's/,/ -map 0:/g')"
+    fi
+
+    if [ "$other_audio_track" ]; then
+        map_options="$map_options -map 0:$other_audio_track"
+
+        readonly channels="$(echo "$identification" |
+            sed -n '/^Track ID '$other_audio_track': /s/^.* audio_channels:\([0-9]\{1,\}\).*$/\1/p')"
+
+        if [ "$channels" ] && (($channels > 2)); then
+            map_options="$map_options -map 0:$other_audio_track"
+            codec_options="-c:v copy -ac 2 -c:a:0 $aac_encoder -b:a:0 160k -ac 6 -c:a:1 ac3 -b:a:1 384k"
+        else
+            codec_options="-c:v copy -ac 2 -c:a $aac_encoder -b:a 160k"
+        fi
+    fi
+
     echo "Converting to MP4 format: $input" >&2
 
     time {
         ffmpeg \
             -i "$input" \
-            -map 0:0 \
             $map_options \
-            -c copy \
+            $codec_options \
             "$output" \
             || exit 1
 
-        if [ "$adjust_enabled" ]; then
-            mp4track --track-index 1 --enabled true "$output" &&
-            mp4track --track-index 2 --enabled false "$output" || exit 1
+        if [ "$aac_audio_track" ] || [ "$ac3_audio_track" ] || [ "$other_audio_track" ]; then
+            flag='true'
+            index='1'
+
+            while read enabled_flag; do
+
+                if [ "$enabled_flag" != "$flag" ]; then
+                    mp4track --track-index $index --enabled $flag "$output" || exit 1
+                fi
+
+                flag='false'
+                index="$((index + 1))"
+
+            done < <(mp4track --list "$output" | sed -n '/enabled/p' | sed 1d | sed 's/^[^=]*= //')
         fi
     }
 else
-    readonly track_names="$(mp4track --list "$input" |
-        sed -n '/userDataName/p' |
-        sed 1d |
-        sed 's/^[^=]*= //;s/^<absent>$//')"
+    track_order="0:$video_track"
+    audio_tracks=''
+
+    if [ "$ac3_audio_track" ]; then
+        track_order="$track_order,0:$ac3_audio_track"
+        audio_tracks="$ac3_audio_track"
+    fi
+
+    if [ "$aac_audio_track" ]; then
+        track_order="$track_order,0:$aac_audio_track"
+
+        if [ "$ac3_audio_track" ]; then
+            audio_tracks="$audio_tracks,$aac_audio_track"
+        else
+            audio_tracks="$aac_audio_track"
+        fi
+
+        if [ "$extra_aac_audio_track_list" ]; then
+            track_order="$track_order$(echo "$extra_aac_audio_track_list" | sed 's/,/,0:/g')"
+            audio_tracks="$audio_tracks$extra_aac_audio_track_list"
+        fi
+    fi
 
     track_name_options=()
 
-    for index in $(echo "$audio_tracks" | sed 's/,/ /g'); do
-        name="$(echo "$track_names" | sed -n ${index}p)"
+    if [ "$audio_tracks" ]; then
+        audio_tracks_option="--audio-tracks $audio_tracks"
 
-        if [ "$name" ]; then
-            track_name_options=("${track_name_options[@]}" --track-name "$index:$name")
-        fi
-    done
+        readonly track_names="$(mp4track --list "$input" |
+            sed -n '/userDataName/p' |
+            sed 1d |
+            sed 's/^[^=]*= //;s/^<absent>$//')"
+
+        for index in $(echo "$audio_tracks" | sed 's/,/ /g'); do
+            name="$(echo "$track_names" | sed -n ${index}p)"
+
+            if [ "$name" ]; then
+                track_name_options=("${track_name_options[@]}" --track-name "$index:$name")
+            fi
+        done
+    else
+        audio_tracks_option='--no-audio'
+    fi
 
     echo "Converting to Matroska format: $input" >&2
 
@@ -201,7 +260,7 @@ else
         --output "$output" \
         --track-order $track_order \
         --disable-track-statistics-tags \
-        --audio-tracks $audio_tracks \
+        $audio_tracks_option \
         "${track_name_options[@]}" \
         "$input" \
         || exit 1
