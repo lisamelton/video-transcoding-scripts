@@ -50,7 +50,7 @@ Additionally, the `transcode-video.sh` script automatically burns any forced sub
 
 However, automatic forced subtitle detection only works when the input is a single file and not a disc image directory.
 
-Another automatic behavior of `transcode-video.sh` is removing duplicate frames in [interlaced video](https://en.wikipedia.org/wiki/Interlaced_video) left over from the [telecine](https://en.wikipedia.org/wiki/Telecine) process often applied to DVDs and some Blu-ray Discs. Again, this only works when the input is a single file and not a disc image directory.
+Another automatic behavior of `transcode-video.sh` is forcing a lower frame rate or applying a `deinterlace` filter to reduce jerky motion and visible artifacts in [interlaced video](https://en.wikipedia.org/wiki/Interlaced_video).
 
 Most automatic behaviors in this script can be overridden or augmented with additional options. But, other than specifying cropping bounds, using `transcode-video.sh` can be as simple as this:
 
@@ -136,7 +136,6 @@ This script requires a properly organized file, in either format, with compatibl
 
 All of these scripts work on OS X because that's the platform where I develop, test and use them. But none of them actually require OS X so, technically, they should also work on Windows and Linux. Your mileage may vary.
 
-
 Since these scripts are essentially intelligent wrappers around other software, they do require certain command line tools to function. Most of these dependencies are available via [Homebrew](http://brew.sh/), a package manager for OS X. However, HandBrake is available via [Homebrew Cask](http://caskroom.io/), an extension to Homebrew.
 
 HandBrake can also be downloaded and installed manually.
@@ -148,7 +147,9 @@ Tool | Transcoding | Crop detection | Conversion | Package | Cask
 `mplayer` | | required | | `mplayer` | &nbsp;
 `mkvmerge` | | | required | `mkvtoolnix` | &nbsp;
 `ffmpeg` | | | required | `ffmpeg` | &nbsp;
-`mp4track` | | | required | `mp4v2` | &nbsp;
+`mp4track` | required | | required | `mp4v2` | &nbsp;
+
+As of version 5.0, `transcode-video.sh` requires HandBrake version 0.10.0 or later.
 
 Installing a package with Homebrew is as simple as:
 
@@ -409,13 +410,11 @@ Prior to version 4.0 of `transcode-video.sh`, `fast` was the default preset. Now
 
     transcode-video.sh --fast "/path/to/Movie.mkv"
 
-Presets faster than `medium` trade quality for more speed. While this quality loss may still be acceptable with `fast`, it becomes more noticeable as preset speed increases.
+Presets faster than `medium` trade quality for more speed. While this quality loss may still be acceptable with `fast`, it becomes more noticeable as preset speed increases at the default target video bitrates.
 
-Quality loss from using faster presets may manifest itself as blockiness, [color banding](https://en.wikipedia.org/wiki/Colour_banding), or loss of detail. These problems can be mitigated by raising the target video bitrate with the `--big` or `--max` options.
+Quality loss from using faster presets may manifest itself as blockiness, [color banding](https://en.wikipedia.org/wiki/Colour_banding), or loss of detail. But these problems can be mitigated by raising the target video bitrate with the `--big` or `--max` options:
 
-When using the `faster` or `veryfast` presets on 1080p or Blu-ray Disc input, a target video bitrate of at least `6500 Kbps` or `6.5 Mbps` is recommended:
-
-    transcode-video.sh --veryfast --max 6500 "/path/to/Movie.mkv"
+    transcode-video.sh --big --veryfast "/path/to/Movie.mkv"
 
 Avoid using `superfast` and `ultrafast` because they significantly lower quality and compression efficiency.
 
@@ -423,15 +422,13 @@ Presets slower than `medium` trade encoding speed for more compression efficienc
 
 When the output video bitrate is not below or near the target using `medium`, applying a slower preset can significantly reduce that bitrate.
 
-These slower presets can also improve quality, but the benefit compared to `medium` may not be perceptible for most input.
+In some cases the `slow` preset can also improve quality, but the benefit compared to `medium` may not be perceptible for most input. Presets slower than `slow` may actually cause small artifacts for some input due to higher compression.
 
 The `slower`, `veryslow` and `placebo` presets are modified in `transcode-video.sh` to maintain compatibility with devices from Apple and other manufacturers. When using these presets for output larger than `1280x720` pixels, the [H.264 level](https://en.wikipedia.org/wiki/H.264/MPEG-4_AVC#Levels) is constrained to `4.0`, usually limiting the number of [reference frames](https://en.wikipedia.org/wiki/Reference_frame_(video)).
 
 Avoid using `placebo` because it's simply not worth the time and may not even produce smaller output than `veryslow`. There's a reason this particular preset doesn't follow the nomenclature.
 
 To produce output even closer in configuration to what's available from the iTunes Store, you need to use at least the `slow` preset. And for a very few number of videos, you may need to use `slower` or `veryslow` to reach the same level of compression.
-
-Always use the slowest preset that you can afford in terms of time. That's `medium` for most people with desktop-class machines, which is another reason it's the default.
 
 ### Evaluating the quality of a transcoding
 
@@ -458,21 +455,9 @@ Use the `--720p` option to constrain 1080p or Blu-ray Disc input within a `1280x
 
 This doesn't affect video input that is already that size or smaller, such as DVDs.
 
-Add the `--no-ac3` option disable multi-channel surround sound and limit output to, at most, two-channel stereo:
+Add the `--no-surround` option to disable multi-channel surround sound and limit output to, at most, two-channel stereo:
 
-    transcode-video.sh --720p --no-ac3 "/path/to/Movie.mkv"
-
-### Adjusting frame rates
-
-The `transcode-video.sh` script can usually handle frame rates automatically.
-
-For Blu-ray Disc input, output frame rates are usually `23.976` or `24` frames per second (FPS), the latter being applied to some animated content.
-
-For DVD input, output frame rates are usually `23.976` or `25` FPS, the latter being applied to [PAL format](https://en.wikipedia.org/wiki/PAL) discs.
-
-Very rarely for some Blu-ray Discs with interlaced video, the proper output frame rate shouldn't be `23.976` FPS. Instead, it should be `25` FPS. Unfortunately, the `transcode-video.sh` script can't detect those situations so manual use of the `--rate` option is required:
-
-    transcode-video.sh --rate 25 "/path/to/Movie.mkv"
+    transcode-video.sh --720p --no-surround "/path/to/Movie.mkv"
 
 ### Adding audio tracks
 
@@ -486,9 +471,25 @@ To also include audio track `5` and name it "Director Commentary":
 
     transcode-video.sh --add-audio 3 --add-audio 5,"Director Commentary" "/path/to/Movie.mkv"
 
-Unfortunately, the optional audio track name can't include a comma (","). This is a limitation of `HandBrakeCLI` and not `transcode-Video.sh`.
+Starting with version 5.0 of `transcode-video.sh`, track names can include a comma (",").
 
-All added audio tracks are transcoded in AAC format.
+By default, all added audio tracks are transcoded in AAC format. If the original audio track is multi-channel surround sound, use the `--allow-ac3` option to transcode in Dolby Digital AC–3 format:
+
+    transcode-video.sh --allow-ac3 --add-audio 3 --add-audio 5,"Director Commentary" "/path/to/Movie.mkv"
+
+The `--allow-ac3` option applies to all added audio tracks.
+
+### Including DTS audio
+
+The DTS audio format has both lossless and lossy variants, and is usually available on Blu-ray Discs. Use the `--allow-dts` option to include these tracks in their original format without transcoding:
+
+    transcode-video.sh --allow-dts "/path/to/Movie.mkv"
+
+The `--allow-dts` option applies to both the main audio track and all added audio tracks.
+
+Keep in mind that lossless DTS-HD Master Audio tracks are encoded at bitrates often larger than the default target video bitrate. So including them is of dubious value if your goal with transcoding is compression.
+
+Also, while `HandBrakeCLI` can include DTS audio tracks within the MP4 format, the output is not compatible with iTunes, Apple TV or many other devices.
 
 ### Batch control for `transcode-video.sh`
 
