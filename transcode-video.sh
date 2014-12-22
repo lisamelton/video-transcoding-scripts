@@ -110,6 +110,9 @@ Audio options:
     --ac3 BITRATE   set AC-3 audio bitrate to 384|448|640 kbps (default: 384)
     --pass-ac3 BITRATE
                     set passthru AC-3 audio <= 384|448|640 kbps (default: 448)
+    --force-encoder ENCODER
+                    forces the audio encoder to ENCODER, ignoring the auto-detected
+                        settings of this script
 
 Subtitle options:
     --burn TRACK    burn subtitle track (default: first forced track, if any)
@@ -230,6 +233,7 @@ allow_dts=''
 allow_surround='yes'
 ac3_bitrate='384'
 pass_ac3_bitrate='448'
+forced_encoder=''
 burned_subtitle_track=''
 auto_burn='yes'
 extra_subtitle_tracks=()
@@ -373,6 +377,10 @@ while [ "$1" ]; do
                     syntax_error "unsupported AC-3 audio passthru bitrate: $pass_ac3_bitrate"
                     ;;
             esac
+            ;;
+        --force-encoder)
+            forced_encoder="$2"
+            shift
             ;;
         --burn)
             burned_subtitle_track="$(printf '%.0f' "$2" 2>/dev/null)"
@@ -862,7 +870,11 @@ elif (($main_audio_track > 1)) || ((${#extra_audio_tracks[*]} > 0)); then
 fi
 
 if [ "$audio_track_list" ]; then
-    audio_options="--audio $audio_track_list --aencoder $audio_encoder_list"
+    if [ "$forced_encoder" == "" ]; then
+        audio_options="--audio $audio_track_list --aencoder $audio_encoder_list"
+    else
+        audio_options="--audio $audio_track_list --aencoder $forced_encoder"
+    fi
 
     if [ "$(echo "$audio_bitrate_list" | sed 's/,//g')" ]; then
         audio_options="$audio_options --ab $audio_bitrate_list"
