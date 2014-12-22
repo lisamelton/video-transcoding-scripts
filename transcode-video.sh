@@ -73,6 +73,8 @@ Input options:
 Output options:
     --mkv           output Matroska format instead of MP4
     --m4v           output MP4 with \`.m4v\` extension instead of \`.mp4\`
+    --output        provide an alternative name for the output file (ignores 
+                        an extension setting, but does not change output format)
 
 Quality options:
     --big           raise default limits for both video and AC-3 audio bitrates
@@ -108,6 +110,9 @@ Audio options:
     --ac3 BITRATE   set AC-3 audio bitrate to 384|448|640 kbps (default: 384)
     --pass-ac3 BITRATE
                     set passthru AC-3 audio <= 384|448|640 kbps (default: 448)
+    --force-encoder ENCODER
+                    forces the audio encoder to ENCODER, ignoring the auto-detected
+                        settings of this script
 
 Subtitle options:
     --burn TRACK    burn subtitle track (default: first forced track, if any)
@@ -228,6 +233,7 @@ allow_dts=''
 allow_surround='yes'
 ac3_bitrate='384'
 pass_ac3_bitrate='448'
+forced_encoder=''
 burned_subtitle_track=''
 auto_burn='yes'
 extra_subtitle_tracks=()
@@ -243,6 +249,7 @@ filter_options=''
 auto_deinterlace='yes'
 passthru_options=''
 debug=''
+output=''
 
 while [ "$1" ]; do
     case $1 in
@@ -266,6 +273,10 @@ while [ "$1" ]; do
             container_format='m4v'
             container_format_options='--large-file'
             ;;
+        --output)
+            output="$2"
+            shift
+            ;;        
         --preset|--veryfast|--faster|--fast|--slow|--slower|--veryslow)
 
             if [ "$1" == '--preset' ]; then
@@ -366,6 +377,10 @@ while [ "$1" ]; do
                     syntax_error "unsupported AC-3 audio passthru bitrate: $pass_ac3_bitrate"
                     ;;
             esac
+            ;;
+        --force-encoder)
+            forced_encoder="$2"
+            shift
             ;;
         --burn)
             burned_subtitle_track="$(printf '%.0f' "$2" 2>/dev/null)"
@@ -554,7 +569,9 @@ if ! $(echo "$media_info" | grep -q '^+ title '$media_title':$'); then
     exit 1
 fi
 
-readonly output="$(basename "$input" | sed 's/\.[0-9A-Za-z]\{1,\}$//').$container_format"
+if [ "$output" == '' ]; then
+    readonly output="$(basename "$input" | sed 's/\.[0-9A-Za-z]\{1,\}$//').$container_format"
+fi
 
 if [ -e "$output" ]; then
     die "output file already exists: $output"
@@ -853,7 +870,11 @@ elif (($main_audio_track > 1)) || ((${#extra_audio_tracks[*]} > 0)); then
 fi
 
 if [ "$audio_track_list" ]; then
-    audio_options="--audio $audio_track_list --aencoder $audio_encoder_list"
+    if [ "$forced_encoder" == "" ]; then
+        audio_options="--audio $audio_track_list --aencoder $audio_encoder_list"
+    else
+        audio_options="--audio $audio_track_list --aencoder $forced_encoder"
+    fi
 
     if [ "$(echo "$audio_bitrate_list" | sed 's/,//g')" ]; then
         audio_options="$audio_options --ab $audio_bitrate_list"
