@@ -73,6 +73,8 @@ Input options:
 Output options:
     --mkv           output Matroska format instead of MP4
     --m4v           output MP4 with \`.m4v\` extension instead of \`.mp4\`
+    --output        provide an alternative name for the output file (ignores 
+                        an extension setting, but does not change output format)
 
 Quality options:
     --big           raise default limits for both video and AC-3 audio bitrates
@@ -243,6 +245,7 @@ filter_options=''
 auto_deinterlace='yes'
 passthru_options=''
 debug=''
+output=''
 
 while [ "$1" ]; do
     case $1 in
@@ -266,6 +269,10 @@ while [ "$1" ]; do
             container_format='m4v'
             container_format_options='--large-file'
             ;;
+        --output)
+            output="$2"
+            shift
+            ;;        
         --preset|--veryfast|--faster|--fast|--slow|--slower|--veryslow)
 
             if [ "$1" == '--preset' ]; then
@@ -554,7 +561,9 @@ if ! $(echo "$media_info" | grep -q '^+ title '$media_title':$'); then
     exit 1
 fi
 
-readonly output="$(basename "$input" | sed 's/\.[0-9A-Za-z]\{1,\}$//').$container_format"
+if [ "$output" == '' ]; then
+    readonly output="$(basename "$input" | sed 's/\.[0-9A-Za-z]\{1,\}$//').$container_format"
+fi
 
 if [ -e "$output" ]; then
     die "output file already exists: $output"
