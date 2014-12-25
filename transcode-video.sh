@@ -7,7 +7,7 @@
 
 about() {
     cat <<EOF
-$program 5.0 of December 20, 2014
+$program 5.1 of December 25, 2014
 Copyright (c) 2013-2014 Don Melton
 EOF
     exit 0
@@ -108,6 +108,11 @@ Audio options:
     --ac3 BITRATE   set AC-3 audio bitrate to 384|448|640 kbps (default: 384)
     --pass-ac3 BITRATE
                     set passthru AC-3 audio <= 384|448|640 kbps (default: 448)
+                        (only applies to multi-channel)
+    --copy-ac3      always passthru AC-3 audio in main track
+                        (including mono and stero, regardless of bitrate)
+    --copy-all-ac3  always passthru AC-3 audio in all tracks
+                        (including mono and stero, regardless of bitrate)
 
 Subtitle options:
     --burn TRACK    burn subtitle track (default: first forced track, if any)
@@ -228,6 +233,8 @@ allow_dts=''
 allow_surround='yes'
 ac3_bitrate='384'
 pass_ac3_bitrate='448'
+copy_ac3=''
+copy_all_ac3=''
 burned_subtitle_track=''
 auto_burn='yes'
 extra_subtitle_tracks=()
@@ -342,6 +349,8 @@ while [ "$1" ]; do
             allow_ac3=''
             allow_dts=''
             allow_surround=''
+            copy_ac3=''
+            copy_all_ac3=''
             ;;
         --ac3)
             ac3_bitrate="$2"
@@ -366,6 +375,13 @@ while [ "$1" ]; do
                     syntax_error "unsupported AC-3 audio passthru bitrate: $pass_ac3_bitrate"
                     ;;
             esac
+            ;;
+        --copy-ac3)
+            copy_ac3='yes'
+            ;;
+        --copy-all-ac3)
+            copy_ac3='yes'
+            copy_all_ac3='yes'
             ;;
         --burn)
             burned_subtitle_track="$(printf '%.0f' "$2" 2>/dev/null)"
@@ -746,7 +762,10 @@ if [ "$audio_track_info" ]; then
     surround_audio_bitrate=''
     stereo_audio_encoder="$aac_encoder"
 
-    if (($(echo "$audio_track_info" | sed 's/^.*(\([0-9]\{1,\}\)\.\([0-9]\{1,\}\) ch).*$/\1\2/;s/^$/0/') > 20)); then
+    if [ "$copy_ac3" ] && [[ "$audio_track_info" =~ '(AC3)' ]]; then
+        surround_audio_encoder='copy'
+
+    elif (($(echo "$audio_track_info" | sed 's/^.*(\([0-9]\{1,\}\)\.\([0-9]\{1,\}\) ch).*$/\1\2/;s/^$/0/') > 20)); then
 
         if [ "$allow_surround" ]; then
 
@@ -806,7 +825,10 @@ if [ "$audio_track_info" ]; then
         audio_track_list="$audio_track_list,$track_number"
         audio_bitrate_list="$audio_bitrate_list,"
 
-        if (($(echo "$audio_track_info" | sed 's/^.*(\([0-9]\{1,\}\)\.\([0-9]\{1,\}\) ch).*$/\1\2/;s/^$/0/') > 20)); then
+        if [ "$copy_all_ac3" ] && [[ "$audio_track_info" =~ '(AC3)' ]]; then
+            audio_encoder_list="$audio_encoder_list,copy"
+
+        elif (($(echo "$audio_track_info" | sed 's/^.*(\([0-9]\{1,\}\)\.\([0-9]\{1,\}\) ch).*$/\1\2/;s/^$/0/') > 20)); then
 
             if [ "$allow_ac3" ]; then
 
