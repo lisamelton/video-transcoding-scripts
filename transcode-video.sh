@@ -7,7 +7,7 @@
 
 about() {
     cat <<EOF
-$program 5.1 of December 25, 2014
+$program 5.2 of December 30, 2014
 Copyright (c) 2013-2014 Don Melton
 EOF
     exit 0
@@ -215,7 +215,6 @@ esac
 media_title='1'
 section_options=''
 container_format='mp4'
-container_format_options='--large-file'
 default_max_bitrate_2160p='10000'
 default_max_bitrate_1080p='5000'
 default_max_bitrate_720p='4000'
@@ -265,13 +264,8 @@ while [ "$1" ]; do
             section_options="$section_options $1 $2"
             shift
             ;;
-        --mkv)
-            container_format='mkv'
-            container_format_options=''
-            ;;
-        --m4v)
-            container_format='m4v'
-            container_format_options='--large-file'
+        --mkv|--m4v)
+            container_format="${1:2:3}"
             ;;
         --preset|--veryfast|--faster|--fast|--slow|--slower|--veryslow)
 
@@ -1178,7 +1172,6 @@ if [ "$debug" ]; then
     echo >&2
     echo "title_options             = $title_options" >&2
     echo "section_options           = $section_options" >&2
-    echo "container_format_options  = $container_format_options" >&2
     echo "preset_options            = $preset_options" >&2
     echo "tune_options              = $tune_options" >&2
     echo "encopts_options           = $encopts_options" >&2
@@ -1197,7 +1190,7 @@ if [ "$debug" ]; then
     echo "output                    = $output" >&2
     echo >&2
 
-    command="$(echo "HandBrakeCLI $title_options $section_options --markers $container_format_options --encoder x264 $preset_options $tune_options --encopts $encopts_options $level_options --quality $rate_factor $frame_rate_options $audio_options" | sed 's/ *$//;s/ \{1,\}/ /g')"
+    command="$(echo "HandBrakeCLI $title_options $section_options --markers --encoder x264 $preset_options $tune_options --encopts $encopts_options $level_options --quality $rate_factor $frame_rate_options $audio_options" | sed 's/ *$//;s/ \{1,\}/ /g')"
 
     if [ "$audio_track_name_list" ]; then
         command="$command $(escape_string "$audio_track_name_list")"
@@ -1250,7 +1243,6 @@ time {
         $title_options \
         $section_options \
         --markers \
-        $container_format_options \
         --encoder x264 \
         $preset_options \
         $tune_options \
