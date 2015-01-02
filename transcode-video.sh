@@ -966,7 +966,7 @@ for item in "${extra_subtitle_tracks[@]}"; do
     fi
 
     if [ "$container_format" != 'mkv' ] && [[ "$subtitle_track_info" =~ '(PGS)' ]]; then
-        die "incompatible additional subtitle track for MP4 format: track_number"
+        die "incompatible additional subtitle track for MP4 format: $track_number"
     fi
 
     if [ ! "$subtitle_track_list" ]; then
