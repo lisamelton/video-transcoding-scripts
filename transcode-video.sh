@@ -96,7 +96,8 @@ Video options:
                         (default: based on input)
 
 Audio options:
-    --audio TRACK   select main audio track (default: 1)
+    --audio TRACKS  select main audio tracks (default: 1, separate multiple 
+                    tracks with `,`)
     --single        don't create second main audio track
     --add-audio TRACK[,NAME]
                     add audio track in AAC format with optional name
@@ -224,7 +225,7 @@ crop_values='0:0:0:0'
 constrain_width='4096'
 constrain_height='2304'
 frame_rate_options=''
-main_audio_track='1'
+main_audio_tracks=(1)
 single_main_audio=''
 extra_audio_tracks=()
 allow_ac3=''
@@ -315,11 +316,19 @@ while [ "$1" ]; do
             fi
             ;;
         --audio)
-            main_audio_track="$(printf '%.0f' "$2" 2>/dev/null)"
+            main_audio_tracks=()
+            IFS=', ' read -a array <<< $2
+            for element in "${array[@]}"
+            do
+                element=($(printf '%.0f' "$element"))
+                if (($element>0)); then
+                    main_audio_tracks+=($element)
+                fi
+            done
             shift
 
-            if (($main_audio_track < 1)); then
-                die "invalid main audio track: $main_audio_track"
+            if ((${#main_audio_tracks[@]} < 1)); then
+                die "invalid audio tracks: $array"
             fi
             ;;
         --single)
@@ -493,7 +502,7 @@ while [ "$1" ]; do
             audio_track="$(printf '%.0f' "$1" 2>/dev/null)"
 
             if (($audio_track > 0)); then
-                main_audio_track="$audio_track"
+                main_audio_tracks=("$audio_track")
                 shift
             fi
             ;;
@@ -741,132 +750,151 @@ readonly all_audio_tracks_info="$(echo "$media_info" |
     sed -n '/^  + audio tracks:$/,/^  + subtitle tracks:$/p' |
     sed -n '/^    + /p')"
 
-audio_track_info="$(echo "$all_audio_tracks_info" | sed -n ${main_audio_track}p)"
+for main_audio_track in "${main_audio_tracks[@]}"
+do
+    audio_track_info="$(echo "$all_audio_tracks_info" | sed -n ${main_audio_track}p)"
 
-if [ "$audio_track_info" ]; then
-    audio_track_list="$main_audio_track"
+    if [ "$audio_track_info" ]; then
+        
+        if [ ${#audio_track_list} -gt 0 ]; then
+            audio_track_list="${audio_track_list},"
+        fi
+    
+        if [ ${#audio_track_name_list} -gt 0 ]; then
+            audio_track_name_list="${audio_track_name_list},"
+        fi
 
-    if $(HandBrakeCLI --help 2>/dev/null | grep -q 'ca_aac'); then
-        aac_encoder='ca_aac'
-    else
-        aac_encoder='av_aac'
+        if [ ${#audio_encoder_list} -gt 0 ]; then
+            audio_encoder_list="${audio_encoder_list},"
+        fi
+    
+        if [ ${#audio_bitrate_list} -gt 0 ]; then
+            audio_bitrate_list="${audio_bitrate_list},"
+        fi
+
+        if $(HandBrakeCLI --help 2>/dev/null | grep -q 'ca_aac'); then
+            aac_encoder='ca_aac'
+        else
+            aac_encoder='av_aac'
+        fi
+
+        surround_audio_encoder=''
+        surround_audio_bitrate=''
+        stereo_audio_encoder="$aac_encoder"
+
+        if [ "$copy_ac3" ] && [[ "$audio_track_info" =~ '(AC3)' ]]; then
+            surround_audio_encoder='copy'
+    
+        elif (($(echo "$audio_track_info" | sed 's/^.*(\([0-9]\{1,\}\)\.\([0-9]\{1,\}\) ch).*$/\1\2/;s/^$/0/') > 20)); then
+    
+            if [ "$allow_surround" ]; then
+    
+                if ( [[ "$audio_track_info" =~ '(AC3)' ]] && ((($(echo "$audio_track_info" | sed -n 's/^.* \([0-9]\{1,\}\)bps$/\1/p' | sed 's/^$/640/') / 1000) <= $pass_ac3_bitrate)) ) || ( [ "$allow_dts" ] && [[ "$audio_track_info" =~ '(DTS' ]] ); then
+                    surround_audio_encoder='copy'
+                else
+                    surround_audio_encoder='ac3'
+                    surround_audio_bitrate="$ac3_bitrate"
+                fi
+            fi
+    
+        elif [[ "$audio_track_info" =~ '(AAC)' ]]; then
+            stereo_audio_encoder='copy'
+        fi
+
+        if [ "$surround_audio_encoder" ] && [ ! "$single_main_audio" ]; then
+            audio_track_list="${audio_track_list}$main_audio_track,$main_audio_track"
+            audio_track_name_list="${audio_track_name_list},"
+    
+            if [ "$container_format" == 'mkv' ]; then
+                audio_encoder_list="${audio_encoder_list}$surround_audio_encoder,$stereo_audio_encoder"
+                audio_bitrate_list="${audio_bitrate_list}$surround_audio_bitrate,"
+            else
+                audio_encoder_list="${audio_encoder_list}$stereo_audio_encoder,$surround_audio_encoder"
+                audio_bitrate_list="${audio_bitrate_list},$surround_audio_bitrate"
+            fi
+    
+            track_id="$((track_id + 2))"
+            track_index="$((track_index + 2))"
+        else
+            audio_track_list="${audio_track_list}$main_audio_track"
+    
+            if [ "$surround_audio_encoder" ] && [ "$container_format" == 'mkv' ]; then
+                audio_encoder_list="${audio_encoder_list}$surround_audio_encoder"
+                audio_bitrate_list="${audio_bitrate_list}$surround_audio_bitrate"
+            else
+                audio_encoder_list="${audio_encoder_list}$stereo_audio_encoder"
+            fi
+    
+            track_id="$((track_id + 1))"
+            track_index="$((track_index + 1))"
+        fi
+    elif (($main_audio_track > 1)); then
+        die "missing audio track: $input"
+    fi
+done
+
+for item in "${extra_audio_tracks[@]}"; do
+    track_number="$(printf '%.0f' "$(echo "$item" | sed 's/,.*$//')" 2>/dev/null)"
+
+    if (($track_number < 1)); then
+        die "invalid additional audio track: $item"
     fi
 
-    surround_audio_encoder=''
-    surround_audio_bitrate=''
-    stereo_audio_encoder="$aac_encoder"
+    audio_track_info="$(echo "$all_audio_tracks_info" | sed -n ${track_number}p)"
 
-    if [ "$copy_ac3" ] && [[ "$audio_track_info" =~ '(AC3)' ]]; then
-        surround_audio_encoder='copy'
+    if [ ! "$audio_track_info" ]; then
+        die "missing additional audio track: $input"
+    fi
+
+    audio_track_list="$audio_track_list,$track_number"
+    audio_bitrate_list="$audio_bitrate_list,"
+
+    if [ "$copy_all_ac3" ] && [[ "$audio_track_info" =~ '(AC3)' ]]; then
+        audio_encoder_list="$audio_encoder_list,copy"
 
     elif (($(echo "$audio_track_info" | sed 's/^.*(\([0-9]\{1,\}\)\.\([0-9]\{1,\}\) ch).*$/\1\2/;s/^$/0/') > 20)); then
 
-        if [ "$allow_surround" ]; then
+        if [ "$allow_ac3" ]; then
 
             if ( [[ "$audio_track_info" =~ '(AC3)' ]] && ((($(echo "$audio_track_info" | sed -n 's/^.* \([0-9]\{1,\}\)bps$/\1/p' | sed 's/^$/640/') / 1000) <= $pass_ac3_bitrate)) ) || ( [ "$allow_dts" ] && [[ "$audio_track_info" =~ '(DTS' ]] ); then
-                surround_audio_encoder='copy'
+                audio_encoder_list="$audio_encoder_list,copy"
             else
-                surround_audio_encoder='ac3'
-                surround_audio_bitrate="$ac3_bitrate"
+                audio_encoder_list="$audio_encoder_list,ac3"
+                audio_bitrate_list="$audio_bitrate_list$ac3_bitrate"
             fi
-        fi
-
-    elif [[ "$audio_track_info" =~ '(AAC)' ]]; then
-        stereo_audio_encoder='copy'
-    fi
-
-    if [ "$surround_audio_encoder" ] && [ ! "$single_main_audio" ]; then
-        audio_track_list="$main_audio_track,$main_audio_track"
-        audio_track_name_list=','
-
-        if [ "$container_format" == 'mkv' ]; then
-            audio_encoder_list="$surround_audio_encoder,$stereo_audio_encoder"
-            audio_bitrate_list="$surround_audio_bitrate,"
-        else
-            audio_encoder_list="$stereo_audio_encoder,$surround_audio_encoder"
-            audio_bitrate_list=",$surround_audio_bitrate"
-        fi
-
-        track_id='3'
-        track_index='3'
-    else
-        audio_track_list="$main_audio_track"
-
-        if [ "$surround_audio_encoder" ] && [ "$container_format" == 'mkv' ]; then
-            audio_encoder_list="$surround_audio_encoder"
-            audio_bitrate_list="$surround_audio_bitrate"
-        else
-            audio_encoder_list="$stereo_audio_encoder"
-        fi
-
-        track_id='2'
-        track_index='2'
-    fi
-
-    for item in "${extra_audio_tracks[@]}"; do
-        track_number="$(printf '%.0f' "$(echo "$item" | sed 's/,.*$//')" 2>/dev/null)"
-
-        if (($track_number < 1)); then
-            die "invalid additional audio track: $item"
-        fi
-
-        audio_track_info="$(echo "$all_audio_tracks_info" | sed -n ${track_number}p)"
-
-        if [ ! "$audio_track_info" ]; then
-            die "missing additional audio track: $input"
-        fi
-
-        audio_track_list="$audio_track_list,$track_number"
-        audio_bitrate_list="$audio_bitrate_list,"
-
-        if [ "$copy_all_ac3" ] && [[ "$audio_track_info" =~ '(AC3)' ]]; then
-            audio_encoder_list="$audio_encoder_list,copy"
-
-        elif (($(echo "$audio_track_info" | sed 's/^.*(\([0-9]\{1,\}\)\.\([0-9]\{1,\}\) ch).*$/\1\2/;s/^$/0/') > 20)); then
-
-            if [ "$allow_ac3" ]; then
-
-                if ( [[ "$audio_track_info" =~ '(AC3)' ]] && ((($(echo "$audio_track_info" | sed -n 's/^.* \([0-9]\{1,\}\)bps$/\1/p' | sed 's/^$/640/') / 1000) <= $pass_ac3_bitrate)) ) || ( [ "$allow_dts" ] && [[ "$audio_track_info" =~ '(DTS' ]] ); then
-                    audio_encoder_list="$audio_encoder_list,copy"
-                else
-                    audio_encoder_list="$audio_encoder_list,ac3"
-                    audio_bitrate_list="$audio_bitrate_list$ac3_bitrate"
-                fi
-            else
-                audio_encoder_list="$audio_encoder_list,$aac_encoder"
-            fi
-
-        elif [[ "$audio_track_info" =~ '(AAC)' ]]; then
-            audio_encoder_list="$audio_encoder_list,copy"
         else
             audio_encoder_list="$audio_encoder_list,$aac_encoder"
         fi
 
-        if [[ "$item" =~ ',' ]]; then
-            track_name="$(echo "$item" | sed 's/^[^,]*,//')"
+    elif [[ "$audio_track_info" =~ '(AAC)' ]]; then
+        audio_encoder_list="$audio_encoder_list,copy"
+    else
+        audio_encoder_list="$audio_encoder_list,$aac_encoder"
+    fi
+
+    if [[ "$item" =~ ',' ]]; then
+        track_name="$(echo "$item" | sed 's/^[^,]*,//')"
+    else
+        track_name=''
+    fi
+
+    sanitized_name="$(echo "$track_name" | sed 's/,/_/g')"
+    audio_track_name_list="$audio_track_name_list,$sanitized_name"
+
+    if [ "$sanitized_name" != "$track_name" ]; then
+
+        if [ "$container_format" == 'mkv' ]; then
+            audio_track_name_edits=("${audio_track_name_edits[@]}" "$track_id,$track_name")
         else
-            track_name=''
+            audio_track_name_edits=("${audio_track_name_edits[@]}" "$track_index,$track_name")
         fi
+    fi
 
-        sanitized_name="$(echo "$track_name" | sed 's/,/_/g')"
-        audio_track_name_list="$audio_track_name_list,$sanitized_name"
+    track_id="$((track_id + 1))"
+    track_index="$((track_index + 1))"
+done
 
-        if [ "$sanitized_name" != "$track_name" ]; then
 
-            if [ "$container_format" == 'mkv' ]; then
-                audio_track_name_edits=("${audio_track_name_edits[@]}" "$track_id,$track_name")
-            else
-                audio_track_name_edits=("${audio_track_name_edits[@]}" "$track_index,$track_name")
-            fi
-        fi
-
-        track_id="$((track_id + 1))"
-        track_index="$((track_index + 1))"
-    done
-
-elif (($main_audio_track > 1)) || ((${#extra_audio_tracks[*]} > 0)); then
-    die "missing audio track: $input"
-fi
 
 if [ "$audio_track_list" ]; then
     audio_options="--audio $audio_track_list --aencoder $audio_encoder_list"
@@ -939,7 +967,7 @@ for item in "${extra_subtitle_tracks[@]}"; do
     fi
 
     if [ "$container_format" != 'mkv' ] && [[ "$subtitle_track_info" =~ '(PGS)' ]]; then
-        die "incompatible additional subtitle track for MP4 format: track_number"
+        die "incompatible additional subtitle track for MP4 format: $track_number"
     fi
 
     if [ ! "$subtitle_track_list" ]; then
