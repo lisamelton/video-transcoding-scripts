@@ -2,13 +2,13 @@
 #
 # transcode-video.sh
 #
-# Copyright (c) 2013-2014 Don Melton
+# Copyright (c) 2013-2015 Don Melton
 #
 
 about() {
     cat <<EOF
-$program 5.2 of December 30, 2014
-Copyright (c) 2013-2014 Don Melton
+$program 5.3 of January 3, 2015
+Copyright (c) 2013-2015 Don Melton
 EOF
     exit 0
 }
@@ -97,7 +97,7 @@ Video options:
 
 Audio options:
     --audio TRACK   select main audio track (default: 1)
-    --single        don't create second main audio track
+    --single        don't create secondary main audio track
     --add-audio TRACK[,NAME]
                     add audio track in AAC format with optional name
                         (can be used multiple times)
@@ -792,7 +792,7 @@ if [ "$audio_track_info" ]; then
     else
         audio_track_list="$main_audio_track"
 
-        if [ "$surround_audio_encoder" ] && [ "$container_format" == 'mkv' ]; then
+        if [ "$surround_audio_encoder" ]; then
             audio_encoder_list="$surround_audio_encoder"
             audio_bitrate_list="$surround_audio_bitrate"
         else
