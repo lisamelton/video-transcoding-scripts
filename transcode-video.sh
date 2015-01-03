@@ -225,7 +225,7 @@ crop_values='0:0:0:0'
 constrain_width='4096'
 constrain_height='2304'
 frame_rate_options=''
-main_audio_tracks=()
+main_audio_tracks=(1)
 single_main_audio=''
 extra_audio_tracks=()
 allow_ac3=''
@@ -316,6 +316,7 @@ while [ "$1" ]; do
             fi
             ;;
         --audio)
+            main_audio_tracks=()
             IFS=', ' read -a array <<< $2
             for element in "${array[@]}"
             do
@@ -501,7 +502,7 @@ while [ "$1" ]; do
             audio_track="$(printf '%.0f' "$1" 2>/dev/null)"
 
             if (($audio_track > 0)); then
-                main_audio_track="$audio_track"
+                main_audio_tracks=("$audio_track")
                 shift
             fi
             ;;
