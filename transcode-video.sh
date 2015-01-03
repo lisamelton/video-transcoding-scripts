@@ -96,7 +96,7 @@ Video options:
                         (default: based on input)
 
 Audio options:
-    --audio TRACKS  select main audio tracks (default: 1, seperate multiple 
+    --audio TRACKS  select main audio tracks (default: 1, separate multiple 
                     tracks with `,`)
     --single        don't create second main audio track
     --add-audio TRACK[,NAME]
