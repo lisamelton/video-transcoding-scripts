@@ -160,7 +160,7 @@ To install both Homebrew Cask and `HandBrakeCLI`, the command line version of Ha
     brew install caskroom/cask/brew-cask
     brew cask install handbrakecli
 
-But that version of HandBrake may contain out-of-date libraries since the development team only does an official release about once a year. Nightly builds of HandBrake are much more up to date and usually very stable.
+Nightly builds of HandBrake are also available. While often containing more up-to-date libraries, these versions of HandBrake are not always stable. Use them with caution.
 
 To install both Homebrew Cask and a nightly build of `HandBrakeCLI`:
 
