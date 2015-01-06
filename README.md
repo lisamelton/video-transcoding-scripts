@@ -155,6 +155,10 @@ Installing a package with Homebrew is as simple as:
 
     brew install mkvtoolnix
 
+However, installing `ffmpeg` is a bit more complicated due to recent changes in its Homebrew formula:
+
+    brew install --with-faac --with-fdk-aac ffmpeg
+
 To install both Homebrew Cask and `HandBrakeCLI`, the command line version of HandBrake:
 
     brew install caskroom/cask/brew-cask
