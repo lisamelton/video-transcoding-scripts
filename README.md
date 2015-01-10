@@ -389,11 +389,11 @@ Also, using `--big` will reduce performance. Why? You're doing more calculations
 
 The `--preset` option in `transcode-video.sh` controls the x264 video encoder, not the other preset system built into HandBrake. It takes a preset name as its single argument:
 
-    transcode-video.sh --preset slow "/path/to/Movie.mkv"
+    transcode-video.sh --preset veryfast "/path/to/Movie.mkv"
 
-Some x264 presets are also available as shortcut options, i.e. you can use just `--slow` instead of having to type `--preset slow`:
+Some x264 presets are also available as shortcut options, i.e. you can use just `--veryfast` instead of having to type `--preset veryfast`:
 
-    transcode-video.sh --slow "/path/to/Movie.mkv"
+    transcode-video.sh --veryfast "/path/to/Movie.mkv"
 
 The x264 presets are supposed to trade encoding speed for compression efficiency, and their names attempt to reflect this. However, that's not quite how they always work.
 
@@ -401,38 +401,32 @@ Preset name | Shortcut option | Note
 --- | --- | ---
 `ultrafast` | none | not recommended
 `superfast` | none | not recommended
-`veryfast` | `--veryfast` | trades quality for speed
-`faster` | `--faster` | trades quality for speed
-`fast` | `--fast` | trades quality for speed
+`veryfast` | `--veryfast` | trades precision for speed
+`faster` | `--faster` | trades precision for speed
+`fast` | `--fast` | trades precision for speed
 `medium` | none | default
 `slow` | `--slow` | trades speed for compression
 `slower` | `--slower` | trades speed for compression
 `veryslow` | `--veryslow` | trades speed for compression
 `placebo` | none | not recommended
 
-Prior to version 4.0 of `transcode-video.sh`, `fast` was the default preset. Now `medium` is the default, just like x264 and HandBrake. This means transcoding is slower. However, you can easily return to the old level of performance with:
+Prior to version 4.0 of `transcode-video.sh`, `fast` was the default preset. Now `medium` is the default, just like x264 and HandBrake.
 
-    transcode-video.sh --fast "/path/to/Movie.mkv"
+Presets faster than `medium` trade precision for more speed. This can mean a loss of fidelity as preset speed increases. Previous versions of this document used the term "quality" instead of "precision."
 
-Presets faster than `medium` trade quality for more speed. While this quality loss may still be acceptable with `fast`, it becomes more noticeable as preset speed increases at the default target video bitrates.
+The rate control system implemented in `transcode-video.sh` reduces the risk of blockiness or loss of detail when applying faster presets. And less precision or fidelity is not always a bad thing with noisy source material due to coarse film grain or sloppy mastering.
 
-Quality loss from using faster presets may manifest itself as blockiness, [color banding](https://en.wikipedia.org/wiki/Colour_banding), or loss of detail. But these problems can be mitigated by raising the target video bitrate with the `--big` or `--max` options:
-
-    transcode-video.sh --big --veryfast "/path/to/Movie.mkv"
-
-Avoid using `superfast` and `ultrafast` because they significantly lower quality and compression efficiency.
+However, avoid using `superfast` and `ultrafast` because they do lower quality as well as compression efficiency.
 
 Presets slower than `medium` trade encoding speed for more compression efficiency. Usually, this means more compression as preset speed decreases. Your mileage may vary.
 
 When the output video bitrate is not below or near the target using `medium`, applying a slower preset can significantly reduce that bitrate.
 
-In some cases the `slow` preset can also improve quality, but the benefit compared to `medium` may not be perceptible for most input. Presets slower than `slow` may actually cause small artifacts for some input due to higher compression.
+Any quality improvement from using the `slow` preset may not be perceptible for most input. Presets slower than `slow` may actually cause small artifacts for some input due to higher compression.
 
 The `slower`, `veryslow` and `placebo` presets are modified in `transcode-video.sh` to maintain compatibility with devices from Apple and other manufacturers. When using these presets for output larger than `1280x720` pixels, the [H.264 level](https://en.wikipedia.org/wiki/H.264/MPEG-4_AVC#Levels) is constrained to `4.0`, usually limiting the number of [reference frames](https://en.wikipedia.org/wiki/Reference_frame_(video)).
 
 Avoid using `placebo` because it's simply not worth the time and may not even produce smaller output than `veryslow`. There's a reason this particular preset doesn't follow the nomenclature.
-
-To produce output even closer in configuration to what's available from the iTunes Store, you need to use at least the `slow` preset. And for a very few number of videos, you may need to use `slower` or `veryslow` to reach the same level of compression.
 
 ### Evaluating the quality of a transcoding
 
