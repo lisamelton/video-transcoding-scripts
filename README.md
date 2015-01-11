@@ -311,7 +311,7 @@ ABR mode creates output of predictable size with unpredictable quality.
 
 Versions of `transcode-video.sh` prior to 3.0 used a modified ABR mode that improved quality by allowing the bitrate to vary much, much more. This was done by setting x264's rate tolerance, how much it allows bitrate to vary, to the highest possible (or infinite) value. This was known as the "`ratetol=inf`" hack.
 
-About 90% of the time, this modified ABR mode hack worked very well. But there were a some cases where it performed poorly, producing noticeable quality defects.
+About 90% of the time, this modified ABR mode hack worked very well. But there were some cases where it performed poorly, producing noticeable quality defects.
 
 Using a constant rate factor is known as variable bitrate (VBR) mode. A rate factor is basically an arbitrary number targeting a constant level of quality. The x264 default CRF value is `23`. Lower values increase quality and bitrate. Higher values lower quality and bitrate. But because the target is a quality level, bitrate always varies significantly depending on input.
 
