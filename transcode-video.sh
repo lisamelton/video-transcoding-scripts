@@ -7,7 +7,7 @@
 
 about() {
     cat <<EOF
-$program 5.4 of January 10, 2015
+$program 5.5 of January 12, 2015
 Copyright (c) 2013-2015 Don Melton
 EOF
     exit 0
@@ -693,21 +693,22 @@ fi
 
 if [ ! "$frame_rate_options" ]; then
     frame_rate_options='--rate 30 --pfr'
-    readonly frame_rate="$(echo "$media_info" | sed -n 's/^  + size: .*, \([0-9]\{1,\}\.[.0-9]\{1,\}\) fps$/\1/p')"
+    readonly frame_rate="$(echo "$media_info" | sed -n 's/^.* scan: 2 previews, .* \([0-9]\{1,\}\.[.0-9]\{1,\}\) fps, .*$/\1/p')"
 
     if [ ! "$frame_rate" ]; then
         die "no video frame rate information in: $input"
     fi
 
-    if [ "$frame_rate" == '29.970' ]; then
-        readonly video_stream_info="$(echo "$media_info" | sed -n '/^    Stream #[^:]\{1,\}: Video: /p' | sed -n 1p)"
-        force_frame_rate=''
+    readonly video_stream_info="$(echo "$media_info" | sed -n '/^    Stream #[^:]\{1,\}: Video: /p' | sed -n 1p)"
+    force_frame_rate=''
 
-        if [ "$video_stream_info" ]; then
-            $(echo "$video_stream_info" | grep -q 'mpeg2video') && force_frame_rate='yes'
-        else
-            $(echo "$media_info" | grep -q '^  + vts ') && force_frame_rate='yes'
-        fi
+    if [ "$video_stream_info" ]; then
+        $(echo "$video_stream_info" | grep -q 'mpeg2video') && force_frame_rate='yes'
+    else
+        $(echo "$media_info" | grep -q '^  + vts ') && force_frame_rate='yes'
+    fi
+
+    if [ "$frame_rate" == '29.970' ]; then
 
         if [ "$force_frame_rate" ]; then
             frame_rate_options='--rate 23.976'
@@ -715,6 +716,14 @@ if [ ! "$frame_rate_options" ]; then
         elif [ "$auto_deinterlace" ]; then
             filter_options="$filter_options --deinterlace"
         fi
+
+    elif [ "$force_frame_rate" ]; then
+
+        case $frame_rate in
+            '23.976'|'24.000'|'25.000')
+                frame_rate_options="--rate $(echo "$frame_rate" | sed 's/\.000$//')"
+                ;;
+        esac
     fi
 fi
 
