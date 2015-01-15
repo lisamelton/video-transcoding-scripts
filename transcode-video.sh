@@ -48,6 +48,10 @@ usage() {
     --audio TRACK   select main audio track (default: 1)
     --burn TRACK    burn subtitle track (default: first forced track, if any)
 
+	--fix_rotation	tries to read the rotation metadata and rotates the video using the ffmpeg
+	
+	--no_logs		disables the creation of log files
+
     --version       output version information and exit
 
 Requires \`HandBrakeCLI\` executable in \$PATH.
@@ -247,6 +251,8 @@ max_rate_factor='25'
 filter_options=''
 auto_deinterlace='yes'
 passthru_options=''
+fix_rotation=''
+no_logs=''
 debug=''
 
 while [ "$1" ]; do
@@ -480,6 +486,12 @@ while [ "$1" ]; do
         --no-opencl|--optimize|--use-opencl|--use-hwd)
             passthru_options="$passthru_options $1"
             ;;
+		--fix_rotation)
+			fix_rotation='yes'
+            ;;
+		--no_logs)
+			no_logs='yes'
+			;;
         --debug)
             debug='yes'
             ;;
@@ -523,7 +535,7 @@ done
 
 # INPUT
 #
-readonly input="$1"
+input="$1"
 
 if [ ! "$input" ]; then
     syntax_error 'too few arguments'
@@ -564,6 +576,33 @@ if ! $(echo "$media_info" | grep -q '^+ title '$media_title':$'); then
 fi
 
 readonly output="$(basename "$input" | sed 's/\.[0-9A-Za-z]\{1,\}$//').$container_format"
+readonly output_fixed="$(basename "$input" | sed 's/\.[0-9A-Za-z]\{1,\}$//')_fixed.$container_format"
+
+if [ "$fix_rotation" ]; then
+	rotation_option=""
+	echo "ffmpeg -y -i \"$input\" 2>&1 | grep rotate | awk '{print \$3}'"
+	rotation=$(ffmpeg -y -i "$input" -nostdin 2>&1 | grep rotate | awk '{print $3}')
+
+	echo "Detected rotation: $rotation"
+
+	if [[ rotation -eq 90 ]]; then
+		rotation_option="transpose=1"
+	elif [[ rotation -eq 180 ]]; then
+		rotation_option="transpose=2,transpose=2"
+	elif [[ rotation -eq 270 ]]; then
+		rotation_option="transpose=2"
+	fi
+
+	if [ "$rotation_option" ]; then
+		echo "with rotation option"
+		readonly input_extension="${input##*.}"
+		readonly temporal="$(basename "$input" | sed 's/\.[0-9A-Za-z]\{1,\}$//')_temp.$input_extension"
+
+		echo "ffmpeg -y -i \"$input\" -vf \"$rotation_option\" -crf 18 -acodec copy \"$temporal\""
+		rotation_result=$(ffmpeg -y -i "$input" -vf "$rotation_option" -crf 18 -acodec copy -nostdin "$temporal")
+		input="$temporal"
+	fi
+fi
 
 if [ -e "$output" ]; then
     die "output file already exists: $output"
@@ -1309,7 +1348,15 @@ time {
         --output "$output" \
         2>&1 | tee -a "${output}.log"
 
+	if [ "$no_logs" ]; then
+		rm "${output}.log"
+	fi
+
     if [ -f "$output" ]; then
+
+		if [ "$temporal" ]; then
+			rm "$temporal"
+		fi
 
         for item in "${audio_track_name_edits[@]}"; do
             track_id="$(echo "$item" | sed 's/,.*$//')"
