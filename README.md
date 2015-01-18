@@ -235,7 +235,7 @@ But usually you need to scan the disk image first to find the correct title numb
 
     transcode-video.sh --title 0 "/path/to/Movie disc image directory/"
 
-All the titles in the disc image directory are then listed, along with other useful information like duration and format, so you can identify exactly which title you want. 
+All the titles in the disc image directory are then listed, along with other useful information like duration and format, so you can identify exactly which title you want.
 
 ## Guide
 
