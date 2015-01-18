@@ -156,7 +156,7 @@ Advanced options:
 Passthru options:
     --angle, --normalize-mix, --drc, --gain,
     --no-opencl, --optimize, --use-opencl, --use-hwd
-                    all passed through to \`HandBrakeCLI\` unchanged 
+                    all passed through to \`HandBrakeCLI\` unchanged
                         (refer to \`HandBrakeCLI --help\` for more information)
 
 Other options:
@@ -874,7 +874,7 @@ if [ "$audio_track_info" ]; then
                 audio_encoder_list="$audio_encoder_list,$stereo_audio_encoder,$surround_audio_encoder"
                 audio_bitrate_list="$audio_bitrate_list,,$surround_audio_bitrate"
             fi
- 
+
             if [ "$sanitized_name" != "$track_name" ]; then
 
                 if [ "$container_format" == 'mkv' ]; then
