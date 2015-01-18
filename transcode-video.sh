@@ -563,7 +563,11 @@ if ! $(echo "$media_info" | grep -q '^+ title '$media_title':$'); then
     exit 1
 fi
 
-readonly output="$(basename "$input" | sed 's/\.[0-9A-Za-z]\{1,\}$//').$container_format"
+if [ -f "$input" ]; then
+    readonly output="$(basename "${input%.*}").$container_format"
+else
+    readonly output="$(basename "$input").$container_format"
+fi
 
 if [ -e "$output" ]; then
     die "output file already exists: $output"
