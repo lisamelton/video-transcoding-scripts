@@ -87,7 +87,7 @@ case $input_container in
         ;;
 esac
 
-readonly output="$(basename "$input" | sed 's/\.[^.]*$//').$container_format"
+readonly output="$(basename "${input%.*}").$container_format"
 
 if [ -e "$output" ]; then
     die "output file already exists: $output"
