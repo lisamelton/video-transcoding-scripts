@@ -7,7 +7,7 @@
 
 about() {
     cat <<EOF
-$program 5.5 of January 12, 2015
+$program 5.6 of January 19, 2015
 Copyright (c) 2013-2015 Don Melton
 EOF
     exit 0
@@ -160,6 +160,7 @@ Passthru options:
                         (refer to \`HandBrakeCLI --help\` for more information)
 
 Other options:
+    --no-log        don't write log file
     --debug         output diagnostic information to \`stderr\` and exit
                         (with \`HandBrakeCLI\` command line sent to \`stdout\`)
     --version       output version information and exit
@@ -247,6 +248,7 @@ max_rate_factor='25'
 filter_options=''
 auto_deinterlace='yes'
 passthru_options=''
+write_log='yes'
 debug=''
 
 while [ "$1" ]; do
@@ -479,6 +481,9 @@ while [ "$1" ]; do
             ;;
         --no-opencl|--optimize|--use-opencl|--use-hwd)
             passthru_options="$passthru_options $1"
+            ;;
+        --no-log)
+            write_log=''
             ;;
         --debug)
             debug='yes'
@@ -1244,7 +1249,11 @@ if [ "$debug" ]; then
         command="$command $(escape_string "$audio_track_name_list")"
     fi
 
-    command="$command $(echo "$crop_options $size_options $filter_options $subtitle_options $srt_options $passthru_options" | sed 's/^ *//;s/ *$//;s/ \{1,\}/ /g') --input $(escape_string "$input") --output $(escape_string "$output") 2>&1 | tee -a $(escape_string "${output}.log")"
+    command="$command $(echo "$crop_options $size_options $filter_options $subtitle_options $srt_options $passthru_options" | sed 's/^ *//;s/ *$//;s/ \{1,\}/ /g') --input $(escape_string "$input") --output $(escape_string "$output")"
+
+    if [ "$write_log" ]; then
+        command="$command 2>&1 | tee -a $(escape_string "${output}.log")"
+    fi
 
     echo "$command"
 
@@ -1284,6 +1293,12 @@ if ( ((${#audio_track_name_edits[*]} > 0)) || [ "$forced_subtitle_track_id" ] ) 
     die "executable not in \$PATH: $tool"
 fi
 
+if [ "$write_log" ]; then
+    log_file="${output}.log"
+else
+    log_file='/dev/null'
+fi
+
 echo "Transcoding: $input" >&2
 
 time {
@@ -1307,7 +1322,7 @@ time {
         $passthru_options \
         --input "$input" \
         --output "$output" \
-        2>&1 | tee -a "${output}.log"
+        2>&1 | tee -a "$log_file"
 
     if [ -f "$output" ]; then
 
