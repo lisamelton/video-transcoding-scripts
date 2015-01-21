@@ -7,7 +7,7 @@
 
 about() {
     cat <<EOF
-$program 5.6 of January 19, 2015
+$program 5.7 of January 20, 2015
 Copyright (c) 2013-2015 Don Melton
 EOF
     exit 0
@@ -160,6 +160,9 @@ Passthru options:
                         (refer to \`HandBrakeCLI --help\` for more information)
 
 Other options:
+    --chapter-names FILENAME
+                    import chapter names from \`.csv\` text file
+                        (in NUMBER,NAME format, e.g. "1,Intro")
     --no-log        don't write log file
     --debug         output diagnostic information to \`stderr\` and exit
                         (with \`HandBrakeCLI\` command line sent to \`stdout\`)
@@ -248,6 +251,7 @@ max_rate_factor='25'
 filter_options=''
 auto_deinterlace='yes'
 passthru_options=''
+chapter_names_file=''
 write_log='yes'
 debug=''
 
@@ -481,6 +485,10 @@ while [ "$1" ]; do
             ;;
         --no-opencl|--optimize|--use-opencl|--use-hwd)
             passthru_options="$passthru_options $1"
+            ;;
+        --chapter-names)
+            chapter_names_file="$2"
+            shift
             ;;
         --no-log)
             write_log=''
@@ -1183,6 +1191,12 @@ fi
 
 section_options="$(echo "$section_options" | sed 's/^ *//')"
 
+if [ "$chapter_names_file" ]; then
+    markers_options='--markers='
+else
+    markers_options='--markers'
+fi
+
 if [ "$preset" == 'medium' ]; then
     preset_options=''
 else
@@ -1225,6 +1239,8 @@ if [ "$debug" ]; then
     echo >&2
     echo "title_options             = $title_options" >&2
     echo "section_options           = $section_options" >&2
+    echo "markers_options           = $markers_options" >&2
+    echo "chapter_names_file        = $chapter_names_file" >&2
     echo "preset_options            = $preset_options" >&2
     echo "tune_options              = $tune_options" >&2
     echo "encopts_options           = $encopts_options" >&2
@@ -1243,7 +1259,13 @@ if [ "$debug" ]; then
     echo "output                    = $output" >&2
     echo >&2
 
-    command="$(echo "HandBrakeCLI $title_options $section_options --markers --encoder x264 $preset_options $tune_options --encopts $encopts_options $level_options --quality $rate_factor $frame_rate_options $audio_options" | sed 's/ *$//;s/ \{1,\}/ /g')"
+    command="$(echo "HandBrakeCLI $title_options $section_options $markers_options" | sed 's/ *$//;s/ \{1,\}/ /g')"
+
+    if [ "$chapter_names_file" ]; then
+        command="$command$(escape_string "$chapter_names_file")"
+    fi
+
+    command="$command $(echo "--encoder x264 $preset_options $tune_options --encopts $encopts_options $level_options --quality $rate_factor $frame_rate_options $audio_options" | sed 's/ *$//;s/ \{1,\}/ /g')"
 
     if [ "$audio_track_name_list" ]; then
         command="$command $(escape_string "$audio_track_name_list")"
@@ -1305,7 +1327,7 @@ time {
     HandBrakeCLI \
         $title_options \
         $section_options \
-        --markers \
+        $markers_options"$chapter_names_file" \
         --encoder x264 \
         $preset_options \
         $tune_options \
