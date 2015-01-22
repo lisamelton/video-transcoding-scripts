@@ -7,7 +7,7 @@
 
 about() {
     cat <<EOF
-$program 5.7 of January 20, 2015
+$program 5.8 of January 21, 2015
 Copyright (c) 2013-2015 Don Melton
 EOF
     exit 0
@@ -69,6 +69,10 @@ Input options:
                         (\`duration\` in seconds, \`pts\` on 90 kHz clock)
 
 Output options:
+    --output FILENAME
+                    set output path and filename
+                        (default: input filename with output format extension
+                            in current working directory)
     --mkv           output Matroska format instead of MP4
     --m4v           output MP4 with \`.m4v\` extension instead of \`.mp4\`
 
@@ -217,6 +221,7 @@ esac
 
 media_title='1'
 section_options=''
+output=''
 container_format='mp4'
 default_max_bitrate_2160p='10000'
 default_max_bitrate_1080p='5000'
@@ -269,8 +274,25 @@ while [ "$1" ]; do
             section_options="$section_options $1 $2"
             shift
             ;;
+        --output)
+            output="$2"
+            shift
+
+            case $output in
+                *.mp4|*.mkv|*.m4v)
+                    container_format="${output: -3}"
+                    ;;
+                *)
+                    die "unsupported filename extension: $output"
+                    ;;
+            esac
+            ;;
         --mkv|--m4v)
-            container_format="${1:2:3}"
+            container_format="${1:2}"
+
+            if [ "$output" ]; then
+                output="${output%.*}.$container_format"
+            fi
             ;;
         --preset|--veryfast|--faster|--fast|--slow|--slower|--veryslow)
 
@@ -576,7 +598,9 @@ if ! $(echo "$media_info" | grep -q '^+ title '$media_title':$'); then
     exit 1
 fi
 
-readonly output="$(basename "$input" | sed 's/\.[0-9A-Za-z]\{1,\}$//').$container_format"
+if [ ! "$output" ]; then
+    output="$(basename "$input" | sed 's/\.[0-9A-Za-z]\{1,\}$//').$container_format"
+fi
 
 if [ -e "$output" ]; then
     die "output file already exists: $output"
