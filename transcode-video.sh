@@ -50,7 +50,7 @@ usage() {
 
     --version       output version information and exit
 
-Requires \`HandBrakeCLI\` executable in \$PATH.
+Requires \`HandBrakeCLI\` executable in \$PATH or Spotlight.
 Requires \`detect-crop.sh\` script in \$PATH when using \`--crop detect\`.
 Output and log file are written to current working directory.
 EOF
@@ -173,7 +173,7 @@ Other options:
                         (with \`HandBrakeCLI\` command line sent to \`stdout\`)
     --version       output version information and exit
 
-Requires \`HandBrakeCLI\` executable in \$PATH.
+Requires \`HandBrakeCLI\` executable in \$PATH or Spotlight.
 Requires \`detect-crop.sh\` script in \$PATH when using \`--crop detect\`.
 May require \`mp4track\` and \`mkvpropedit\` executables in \$PATH for some options.
 Output and log file are written to current working directory.
@@ -570,8 +570,12 @@ if [ ! -e "$input" ]; then
     die "input not found: $input"
 fi
 
-if ! $(which HandBrakeCLI >/dev/null); then
-    die 'executable not in $PATH: HandBrakeCLI'
+HandBrakeCLI='HandBrakeCLI'
+if ! $(which "$HandBrakeCLI" >/dev/null); then
+    HandBrakeCLI="$(mdfind "kMDItemContentType == "public.unix-executable" && kMDItemFSName == "$HandBrakeCLI"" | head -1)"
+    if [ -z "$HandBrakeCLI" ]; then
+        die 'executable not in $PATH or Spotlight: HandBrakeCLI'
+    fi
 fi
 
 if [ "$media_title" == '0' ]; then
@@ -582,7 +586,7 @@ fi
 # media information. Significantly speed up scan with `--previews 2:0` option
 # and argument.
 #
-readonly media_info="$(HandBrakeCLI --title $media_title --scan --previews 2:0 --input "$input" 2>&1)"
+readonly media_info="$("$HandBrakeCLI" --title $media_title --scan --previews 2:0 --input "$input" 2>&1)"
 
 if [ "$media_title" == '0' ]; then
     echo "$media_info"
@@ -806,7 +810,7 @@ audio_track_info="$(echo "$all_audio_tracks_info" | sed -n ${main_audio_track}p)
 if [ "$audio_track_info" ]; then
     audio_track_list="$main_audio_track"
 
-    if $(HandBrakeCLI --help 2>/dev/null | grep -q 'ca_aac'); then
+    if $("$HandBrakeCLI" --help 2>/dev/null | grep -q 'ca_aac'); then
         aac_encoder='ca_aac'
     else
         aac_encoder='av_aac'
@@ -1298,7 +1302,7 @@ if [ "$debug" ]; then
     echo "output                    = $output" >&2
     echo >&2
 
-    command="$(echo "HandBrakeCLI $title_options $section_options $markers_options" | sed 's/ *$//;s/ \{1,\}/ /g')"
+    command="$(echo ""$HandBrakeCLI" $title_options $section_options $markers_options" | sed 's/ *$//;s/ \{1,\}/ /g')"
 
     if [ "$chapter_names_file" ]; then
         command="$command$(escape_string "$chapter_names_file")"
@@ -1363,7 +1367,7 @@ fi
 echo "Transcoding: $input" >&2
 
 time {
-    HandBrakeCLI \
+    "$HandBrakeCLI" \
         $title_options \
         $section_options \
         $markers_options"$chapter_names_file" \
