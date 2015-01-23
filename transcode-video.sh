@@ -7,7 +7,7 @@
 
 about() {
     cat <<EOF
-$program 5.8 of January 21, 2015
+$program 5.9 of January 22, 2015
 Copyright (c) 2013-2015 Don Melton
 EOF
     exit 0
@@ -42,7 +42,7 @@ usage() {
     --slow, --slower, --veryslow
                     use x264 encoder preset to trade speed for compression
     --crop T:B:L:R  set video crop values (default: 0:0:0:0)
-                        (use \`detect-crop.sh\` script for optimal bounds)
+                        (use \`--crop detect\` to invoke \`detect-crop.sh\`)
                         (use \`--crop auto\` for \`HandBrakeCLI\` behavior)
     --720p          constrain video to fit within 1280x720 pixel bounds
     --audio TRACK   select main audio track (default: 1)
@@ -51,6 +51,7 @@ usage() {
     --version       output version information and exit
 
 Requires \`HandBrakeCLI\` executable in \$PATH.
+Requires \`detect-crop.sh\` script in \$PATH when using \`--crop detect\`.
 Output and log file are written to current working directory.
 EOF
     exit 0
@@ -86,7 +87,7 @@ Quality options:
 
 Video options:
     --crop T:B:L:R  set video crop values (default: 0:0:0:0)
-                        (use \`detect-crop.sh\` script for optimal bounds)
+                        (use \`--crop detect\` to invoke \`detect-crop.sh\`)
                         (use \`--crop auto\` for \`HandBrakeCLI\` behavior)
     --720p          constrain video to fit within 1280x720 pixel bounds
     --1080p             "       "   "   "    "    1920x1080  "     "
@@ -173,6 +174,7 @@ Other options:
     --version       output version information and exit
 
 Requires \`HandBrakeCLI\` executable in \$PATH.
+Requires \`detect-crop.sh\` script in \$PATH when using \`--crop detect\`.
 May require \`mp4track\` and \`mkvpropedit\` executables in \$PATH for some options.
 Output and log file are written to current working directory.
 EOF
@@ -604,6 +606,19 @@ fi
 
 if [ -e "$output" ]; then
     die "output file already exists: $output"
+fi
+
+if [ "$crop_values" == 'detect' ]; then
+
+    if ! $(which detect-crop.sh >/dev/null); then
+        die 'script not in $PATH: detect-crop.sh'
+    fi
+
+    crop_values="$(detect-crop.sh --title $media_title --values-only "$input")"
+
+    if [ ! "$crop_values" ]; then
+        die "crop ambiguous or unavailable for: $input"
+    fi
 fi
 
 # VIDEO
