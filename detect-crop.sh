@@ -2,13 +2,13 @@
 #
 # detect-crop.sh
 #
-# Copyright (c) 2013-2014 Don Melton
+# Copyright (c) 2013-2015 Don Melton
 #
 
 about() {
     cat <<EOF
-$program 3.2 of November 25, 2014
-Copyright (c) 2013-2014 Don Melton
+$program 3.3 of January 22, 2015
+Copyright (c) 2013-2015 Don Melton
 EOF
     exit 0
 }
@@ -25,6 +25,7 @@ Usage: $program [OPTION]... [FILE|DIRECTORY]
     --max-step MINUTES  maximum interval between samples (default: 5)
                             (Must be integer between 1 and 10)
     --no-constrain      don't constrain crop to optimal shape
+    --values-only       output only unambiguous crop values, not commands
 
     --help              display this help and exit
     --version           output version information and exit
@@ -135,6 +136,7 @@ debug=''
 title='1'
 constrain='yes'
 max_step=5
+values_only=''
 
 while [ "$1" ]; do
     case $1 in
@@ -166,6 +168,9 @@ while [ "$1" ]; do
         --constrain)
             deprecated "$1"
             constrain='yes'
+            ;;
+        --values-only)
+            values_only='yes'
             ;;
         --with-handbrake)
             deprecated "$1"
@@ -359,6 +364,13 @@ if [ -f "$input" ]; then
 
     if [ "$mplayer_crop" != "$first_mplayer_crop" ] || [ "$handbrake_crop" != "$first_handbrake_crop" ]; then
         echo 'Results differ.' >&2
+
+        if [ "$values_only" ]; then
+            echo "From \`HandBrakeCLI\`: $first_handbrake_crop" >&2
+            echo "From \`mplayer\`:      $handbrake_crop" >&2
+            exit 1
+        fi
+
         echo
         echo '# From `HandBrakeCLI`:'
         print_commands "$first_mplayer_crop" "$first_handbrake_crop"
@@ -366,6 +378,11 @@ if [ -f "$input" ]; then
     else
         echo 'Results are identical.' >&2
     fi
+fi
+
+if [ "$values_only" ]; then
+    echo "$handbrake_crop"
+    exit
 fi
 
 print_commands "$mplayer_crop" "$handbrake_crop"
