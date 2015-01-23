@@ -195,8 +195,12 @@ if [ ! -e "$input" ]; then
     die "input not found: $input"
 fi
 
-if ! $(which HandBrakeCLI >/dev/null); then
-    die 'executable not in $PATH: HandBrakeCLI'
+HandBrakeCLI='HandBrakeCLI'
+if ! $(which "$HandBrakeCLI" >/dev/null); then
+    HandBrakeCLI="$(mdfind "kMDItemContentType == "public.unix-executable" && kMDItemFSName == "$HandBrakeCLI"" | head -1)"
+    if [ -z "$HandBrakeCLI" ]; then
+        die 'executable not in $PATH or Spotlight: HandBrakeCLI'
+    fi
 fi
 
 if ! $(which mplayer >/dev/null); then
@@ -210,7 +214,7 @@ else
     samples='1'
 fi
 
-media_info="$(HandBrakeCLI --title $title --scan --previews $samples:0 --input "$input" 2>&1)"
+media_info="$("$HandBrakeCLI" --title $title --scan --previews $samples:0 --input "$input" 2>&1)"
 
 if [ "$debug" ]; then
     echo "$media_info" >&2
@@ -278,7 +282,7 @@ if [ -f "$input" ]; then
     echo 'Scanning with `HandBrakeCLI`...' >&2
 fi
 
-media_info="$(HandBrakeCLI --title $title --scan --previews $samples:0 --input "$input" 2>&1)"
+media_info="$("$HandBrakeCLI" --title $title --scan --previews $samples:0 --input "$input" 2>&1)"
 
 readonly autocrop_array=($(echo "$media_info" |
     sed -n 's|^  + autocrop: \([0-9/]*\)$|\1|p' |
