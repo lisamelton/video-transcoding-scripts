@@ -7,7 +7,7 @@
 
 about() {
     cat <<EOF
-$program 5.9 of January 22, 2015
+$program 5.10 of February 2, 2015
 Copyright (c) 2013-2015 Don Melton
 EOF
     exit 0
@@ -70,8 +70,8 @@ Input options:
                         (\`duration\` in seconds, \`pts\` on 90 kHz clock)
 
 Output options:
-    --output FILENAME
-                    set output path and filename
+    --output FILENAME|DIRECTORY
+                    set output path and filename, or just path
                         (default: input filename with output format extension
                             in current working directory)
     --mkv           output Matroska format instead of MP4
@@ -89,6 +89,8 @@ Video options:
     --crop T:B:L:R  set video crop values (default: 0:0:0:0)
                         (use \`--crop detect\` to invoke \`detect-crop.sh\`)
                         (use \`--crop auto\` for \`HandBrakeCLI\` behavior)
+    --480p          constrain video to fit within  854x480 pixel bounds
+                        (not perfect 16:9 bounds and not for DVD input)
     --720p          constrain video to fit within 1280x720 pixel bounds
     --1080p             "       "   "   "    "    1920x1080  "     "
     --2160p             "       "   "   "    "    3840x2160  "     "
@@ -224,6 +226,7 @@ esac
 media_title='1'
 section_options=''
 output=''
+output_prefix=''
 container_format='mp4'
 default_max_bitrate_2160p='10000'
 default_max_bitrate_1080p='5000'
@@ -280,14 +283,19 @@ while [ "$1" ]; do
             output="$2"
             shift
 
-            case $output in
-                *.mp4|*.mkv|*.m4v)
-                    container_format="${output: -3}"
-                    ;;
-                *)
-                    die "unsupported filename extension: $output"
-                    ;;
-            esac
+            if [ -d "$output" ]; then
+                output_prefix="$(echo "$output" | sed 's|/$||')/"
+                output=''
+            else
+                case $output in
+                    *.mp4|*.mkv|*.m4v)
+                        container_format="${output: -3}"
+                        ;;
+                    *)
+                        die "unsupported filename extension: $output"
+                        ;;
+                esac
+            fi
             ;;
         --mkv|--m4v)
             container_format="${1:2}"
@@ -316,6 +324,10 @@ while [ "$1" ]; do
         --crop)
             crop_values="$2"
             shift
+            ;;
+        --480p)
+            constrain_width='854'
+            constrain_height='480'
             ;;
         --720p|--resize)
             [ "$1" == '--resize' ] && deprecated_and_replaced "$1" '--720p'
@@ -601,7 +613,7 @@ if ! $(echo "$media_info" | grep -q '^+ title '$media_title':$'); then
 fi
 
 if [ ! "$output" ]; then
-    output="$(basename "$input" | sed 's/\.[0-9A-Za-z]\{1,\}$//').$container_format"
+    output="$output_prefix$(basename "$input" | sed 's/\.[0-9A-Za-z]\{1,\}$//').$container_format"
 fi
 
 if [ -e "$output" ]; then
@@ -687,7 +699,10 @@ elif (($width > 1280)) || (($height > 720)); then
             ;;
     esac
 
-elif (($width > 720)) || (($height > 576)); then
+# Test for total number of pixels instead of bounds so using `--480p` option,
+# with width up to 854 pixels, works like DVD input.
+#
+elif ((($width * $height) > (720 * 576))); then
     vbv_maxrate="$default_max_bitrate_720p"
     max_bufsize='17500'
 else
