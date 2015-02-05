@@ -145,7 +145,7 @@ Tool | Transcoding | Crop detection | Conversion | Package | Cask
 `HandBrakeCLI` | required | required | | | `handbrakecli`
 `mkvpropedit` | required | | | `mkvtoolnix` | &nbsp;
 `mplayer` | | required | | `mplayer` | &nbsp;
-`mkvmerge` | | | required | `mkvtoolnix` | &nbsp;
+`mkvmerge` | required | | required | `mkvtoolnix` | &nbsp;
 `ffmpeg` | | | required | `ffmpeg` | &nbsp;
 `mp4track` | required | | required | `mp4v2` | &nbsp;
 
