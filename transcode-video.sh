@@ -7,7 +7,7 @@
 
 about() {
     cat <<EOF
-$program 5.10 of February 2, 2015
+$program 5.11 of February 4, 2015
 Copyright (c) 2013-2015 Don Melton
 EOF
     exit 0
@@ -126,6 +126,10 @@ Subtitle options:
     --add-subtitle [forced,]TRACK
                     add subtitle track with optional forced playback flag
                         (can be used multiple times)
+    --find-forced burn|add
+                    scan for forced subtitle in same language as main audio
+                        and, if found, burn into video or add as forced track
+                        (disables some other subtitle behaviors and options)
     --burn-srt [ENCODING,][OFFSET,]FILENAME
                     burn subtitle track from SubRip-format \`.srt\` text file
                         with optional character set encoding (default: latin1)
@@ -177,6 +181,7 @@ Other options:
 
 Requires \`HandBrakeCLI\` executable in \$PATH.
 Requires \`detect-crop.sh\` script in \$PATH when using \`--crop detect\`.
+May require \`mkvmerge\` executable in \$PATH when using \`--find-forced add\`.
 May require \`mp4track\` and \`mkvpropedit\` executables in \$PATH for some options.
 Output and log file are written to current working directory.
 EOF
@@ -250,6 +255,7 @@ copy_all_ac3=''
 burned_subtitle_track=''
 auto_burn='yes'
 extra_subtitle_tracks=()
+find_forced=''
 burned_srt_file=''
 extra_srt_files=()
 tune_options=''
@@ -427,6 +433,7 @@ while [ "$1" ]; do
             fi
 
             burned_srt_file=''
+            find_forced=''
             ;;
         --no-auto-burn)
             auto_burn=''
@@ -435,11 +442,29 @@ while [ "$1" ]; do
             extra_subtitle_tracks=("${extra_subtitle_tracks[@]}" "$2")
             shift
             ;;
-        --burn-srt)
-            burned_srt_file="$2"
+        --find-forced)
+            find_forced="$2"
+            shift
+
+            case $find_forced in
+                burn|add)
+                    ;;
+                *)
+                    syntax_error "invalid find forced argument: $find_forced"
+                    ;;
+            esac
+
             burned_subtitle_track=''
             auto_burn=''
+            burned_srt_file=''
+            ;;
+        --burn-srt)
+            burned_srt_file="$2"
             shift
+
+            burned_subtitle_track=''
+            auto_burn=''
+            find_forced=''
             ;;
         --add-srt|--srt)
             [ "$1" == '--srt' ] && deprecated_and_replaced "$1" '--add-srt'
@@ -1035,6 +1060,10 @@ elif [ "$auto_burn" ]; then
 
         subtitle_track="$((subtitle_track + 1))"
     done
+
+elif [ "$find_forced" ]; then
+    subtitle_track_list='scan'
+
 fi
 
 forced_subtitle_track_id=''
@@ -1054,7 +1083,7 @@ for item in "${extra_subtitle_tracks[@]}"; do
     fi
 
     if [ "$container_format" != 'mkv' ] && [[ "$subtitle_track_info" =~ '(PGS)' ]]; then
-        die "incompatible additional subtitle track for MP4 format: track_number"
+        die "incompatible additional subtitle track for MP4 format: $track_number"
     fi
 
     if [ ! "$subtitle_track_list" ]; then
@@ -1063,7 +1092,7 @@ for item in "${extra_subtitle_tracks[@]}"; do
         subtitle_track_list="$subtitle_track_list,$track_number"
     fi
 
-    if [[ "$item" =~ ^'forced,' ]]; then
+    if [[ "$item" =~ ^'forced,' ]] && [ ! "$find_forced" ]; then
 
         if [ "$track_number" == "$burned_subtitle_track" ]; then
             die "forced subtitle track is already burned: $track_number"
@@ -1085,6 +1114,15 @@ if [ "$subtitle_track_list" ]; then
 
     if [ "$burned_subtitle_track" ]; then
         subtitle_options="$subtitle_options --subtitle-burned"
+
+    elif [ "$find_forced" ]; then
+        subtitle_options="$subtitle_options --subtitle-forced"
+
+        if [ "$find_forced" == 'burn' ]; then
+            subtitle_options="$subtitle_options --subtitle-burned"
+        else
+            subtitle_options="$subtitle_options --subtitle-default"
+        fi
     fi
 else
     subtitle_options=''
@@ -1158,10 +1196,13 @@ for item in "${extra_srt_files[@]}"; do
 
         if [ "$srt_prefix" == 'forced' ]; then
 
-            if [ "$container_format" == 'mkv' ]; then
-                forced_subtitle_track_id="$track_id"
-            else
-                forced_subtitle_track_id="$track_index"
+            if [ ! "$find_forced" ]; then
+
+                if [ "$container_format" == 'mkv' ]; then
+                    forced_subtitle_track_id="$track_id"
+                else
+                    forced_subtitle_track_id="$track_index"
+                fi
             fi
 
             srt_file="$(echo "$srt_file" | sed 's/^[^,]*,//')"
@@ -1352,6 +1393,9 @@ if [ "$debug" ]; then
         else
             echo "[ -f $(escape_string "$output") ] && mp4track --track-index $forced_subtitle_track_id --enabled true $(escape_string "$output")"
         fi
+
+    elif [ "$find_forced" == 'add' ] && [ "$container_format" == 'mkv' ]; then
+        echo "[ -f $(escape_string "$output") ] && [ \"\$(mkvmerge --identify-verbose $(escape_string "$output") 2>/dev/null | sed -n '/^Track ID [0-9]\\{1,\\}: subtitles .* default_track:1 .*\$/p')\" ] && mkvpropedit --quiet --edit track:s1 --set flag-forced=1 $(escape_string "$output")"
     fi
 
     exit
@@ -1360,6 +1404,14 @@ fi
 # OUTPUT
 #
 if [ "$container_format" == 'mkv' ]; then
+
+    if [ "$find_forced" == 'add' ]; then
+
+        if ! $(which mkvmerge >/dev/null); then
+            die 'executable not in $PATH: mkvmerge'
+        fi
+    fi
+
     tool='mkvpropedit'
 else
     tool='mp4track'
@@ -1421,6 +1473,10 @@ time {
             else
                 mp4track --track-index $forced_subtitle_track_id --enabled true "$output" || exit 1
             fi
+
+        elif [ "$find_forced" == 'add' ] && [ "$container_format" == 'mkv' ] && [ "$(mkvmerge --identify-verbose "$output" 2>/dev/null | sed -n '/^Track ID [0-9]\{1,\}: subtitles .* default_track:1 .*$/p')" ]; then
+            mkvpropedit --quiet --edit track:s1 --set flag-forced=1 "$output" || exit 1
+
         fi
     fi
 }
