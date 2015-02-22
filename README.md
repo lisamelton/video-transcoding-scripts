@@ -138,6 +138,12 @@ All of these scripts work on OS X because that's the platform where I develop, t
 
 Since these scripts are essentially intelligent wrappers around other software, they do require certain command line tools to function. Most of these dependencies are available via [Homebrew](http://brew.sh/), a package manager for OS X. However, HandBrake is available via [Homebrew Cask](http://caskroom.io/), an extension to Homebrew.
 
+### Bootstrapping OS X with `setup.sh`
+
+If you'd like to use a script to help bootstrap your OS X environment, just run `setup.sh`. Installing [Homebrew Cask](http://caskroom.io/) may ask for sudo privileges to set itself up correctly.
+
+### Individual Requirements
+
 HandBrake can also be downloaded and installed manually.
 
 Tool | Transcoding | Crop detection | Conversion | Package | Cask
