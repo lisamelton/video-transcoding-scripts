@@ -7,13 +7,13 @@
 
 about() {
     cat <<EOF
-$program 5.11 of February 4, 2015
+$program 5.12 of March 6, 2015
 Copyright (c) 2013-2015 Don Melton
 EOF
     exit 0
 }
 
-usage_prologue() {
+usage() {
     cat <<EOF
 Transcode video file or disc image directory into format and size similar to
 popular online downloads. Works best with Blu-ray or DVD rip.
@@ -23,43 +23,6 @@ WITHOUT ANY command line options.
 
 Usage: $program [OPTION]... [FILE|DIRECTORY]
 
-    --help          display basic options and exit
-    --fullhelp      display ALL options and exit
-
-EOF
-}
-
-usage() {
-    usage_prologue
-    cat <<EOF
-    --title NUMBER  select numbered title in video media (default: 1)
-                        (\`0\` to scan media, list title numbers and exit)
-    --mkv           output Matroska format instead of MP4
-    --big           raise default limits for both video and AC-3 audio bitrates
-                        (always increases output size)
-    --fast, --faster, --veryfast
-                    use x264 encoder preset to trade precision for speed
-    --slow, --slower, --veryslow
-                    use x264 encoder preset to trade speed for compression
-    --crop T:B:L:R  set video crop values (default: 0:0:0:0)
-                        (use \`--crop detect\` to invoke \`detect-crop.sh\`)
-                        (use \`--crop auto\` for \`HandBrakeCLI\` behavior)
-    --720p          constrain video to fit within 1280x720 pixel bounds
-    --audio TRACK   select main audio track (default: 1)
-    --burn TRACK    burn subtitle track (default: first forced track, if any)
-
-    --version       output version information and exit
-
-Requires \`HandBrakeCLI\` executable in \$PATH.
-Requires \`detect-crop.sh\` script in \$PATH when using \`--crop detect\`.
-Output and log file are written to current working directory.
-EOF
-    exit 0
-}
-
-usage_full() {
-    usage_prologue
-    cat <<EOF
 Input options:
     --title NUMBER  select numbered title in video media (default: 1)
                         (\`0\` to scan media, list title numbers and exit)
@@ -70,7 +33,7 @@ Input options:
                         (\`duration\` in seconds, \`pts\` on 90 kHz clock)
 
 Output options:
-    --output FILENAME|DIRECTORY
+-o, --output FILENAME|DIRECTORY
                     set output path and filename, or just path
                         (default: input filename with output format extension
                             in current working directory)
@@ -94,12 +57,16 @@ Video options:
     --720p          constrain video to fit within 1280x720 pixel bounds
     --1080p             "       "   "   "    "    1920x1080  "     "
     --2160p             "       "   "   "    "    3840x2160  "     "
+    --width         change pixel aspect ratio with custom width
+    --height          "      "     "      "    "     "    height
     --rate FPS[,limited]
                     set video frame rate with optional peak-limited flag
                         (default: based on input)
 
 Audio options:
-    --audio TRACK   select main audio track (default: 1)
+    --audio TRACK[,NAME]
+                    select main audio track (default: 1)
+                        with optional name
     --single        don't create secondary main audio track
     --add-audio [double,]TRACK[,NAME]
                     add audio track in AAC format
@@ -107,6 +74,11 @@ Audio options:
                             in multi-channel format if available
                         with optional name
                         (can be used multiple times)
+    --add-all-audio single|double
+                    add all other audio tracks in single AAC format
+                        or double AAC+multi-channel format, if avaiable
+                        (doesn't apply to main audio track)
+                        (not compatible with \`--add-audio\` option)
     --allow-ac3     allow multi-channel AC-3 format in additional audio tracks
     --allow-dts     allow multi-channel DTS formats in all audio tracks
                         (also allows AC-3 format in additional audio tracks)
@@ -119,6 +91,9 @@ Audio options:
                         (including mono and stero, regardless of bitrate)
     --copy-all-ac3  always passthru AC-3 audio in all tracks
                         (including mono and stero, regardless of bitrate)
+    --copy-audio-names
+                    passthru any original audio track names
+                        (unless a name is specified with another option)
 
 Subtitle options:
     --burn TRACK    burn subtitle track (default: first forced track, if any)
@@ -126,6 +101,10 @@ Subtitle options:
     --add-subtitle [forced,]TRACK
                     add subtitle track with optional forced playback flag
                         (can be used multiple times)
+    --add-all-subtitles
+                    add all other subtitles
+                        (doesn't apply to burned subtitle track)
+                        (not compatible with \`--add-subtitle\` option)
     --find-forced burn|add
                     scan for forced subtitle in same language as main audio
                         and, if found, burn into video or add as forced track
@@ -177,6 +156,8 @@ Other options:
     --no-log        don't write log file
     --debug         output diagnostic information to \`stderr\` and exit
                         (with \`HandBrakeCLI\` command line sent to \`stdout\`)
+
+-h, --help          display this help and exit
     --version       output version information and exit
 
 Requires \`HandBrakeCLI\` executable in \$PATH.
@@ -217,11 +198,8 @@ readonly program="$(basename "$0")"
 # OPTIONS
 #
 case $1 in
-    --help)
+    --help|-h|--fullhelp)
         usage
-        ;;
-    --fullhelp)
-        usage_full
         ;;
     --version)
         about
@@ -241,10 +219,14 @@ preset='medium'
 crop_values='0:0:0:0'
 constrain_width='4096'
 constrain_height='2304'
+custom_width=''
+custom_height=''
 frame_rate_options=''
 main_audio_track='1'
+main_audio_track_name=''
 single_main_audio=''
 extra_audio_tracks=()
+add_all_audio=''
 allow_ac3=''
 allow_dts=''
 allow_surround='yes'
@@ -252,9 +234,11 @@ ac3_bitrate='384'
 pass_ac3_bitrate='448'
 copy_ac3=''
 copy_all_ac3=''
+copy_audio_names=''
 burned_subtitle_track=''
 auto_burn='yes'
 extra_subtitle_tracks=()
+add_all_subtitles=''
 find_forced=''
 burned_srt_file=''
 extra_srt_files=()
@@ -285,7 +269,7 @@ while [ "$1" ]; do
             section_options="$section_options $1 $2"
             shift
             ;;
-        --output)
+        --output|-o)
             output="$2"
             shift
 
@@ -348,6 +332,22 @@ while [ "$1" ]; do
             constrain_width='3840'
             constrain_height='2160'
             ;;
+        --width)
+            custom_width="$(printf '%.0f' "$2" 2>/dev/null)"
+            shift
+
+            if (($custom_width < 1)); then
+                die "invalid custom width: $custom_width"
+            fi
+            ;;
+        --height)
+            custom_height="$(printf '%.0f' "$2" 2>/dev/null)"
+            shift
+
+            if (($custom_height < 1)); then
+                die "invalid custom height: $custom_height"
+            fi
+            ;;
         --rate)
             frame_rate_argument="$2"
             shift
@@ -362,11 +362,19 @@ while [ "$1" ]; do
             fi
             ;;
         --audio)
-            main_audio_track="$(printf '%.0f' "$2" 2>/dev/null)"
+            audio_track_argument="$2"
             shift
+
+            main_audio_track="$(printf '%.0f' "$(echo "$audio_track_argument" | sed 's/,.*$//')" 2>/dev/null)"
 
             if (($main_audio_track < 1)); then
                 die "invalid main audio track: $main_audio_track"
+            fi
+
+            if [[ "$audio_track_argument" =~ ',' ]]; then
+                main_audio_track_name="$(echo "$audio_track_argument" | sed 's/^[^,]*,//')"
+            else
+                main_audio_track_name=''
             fi
             ;;
         --single)
@@ -375,6 +383,22 @@ while [ "$1" ]; do
         --add-audio)
             extra_audio_tracks=("${extra_audio_tracks[@]}" "$2")
             shift
+
+            add_all_audio=''
+            ;;
+        --add-all-audio)
+            add_all_audio="$2"
+            shift
+
+            case $add_all_audio in
+                single|double)
+                    ;;
+                *)
+                    syntax_error "unsupported audio width: $add_all_audio"
+                    ;;
+            esac
+
+            extra_audio_tracks=()
             ;;
         --allow-ac3)
             allow_ac3='yes'
@@ -424,6 +448,9 @@ while [ "$1" ]; do
             copy_ac3='yes'
             copy_all_ac3='yes'
             ;;
+        --copy-audio-names)
+            copy_audio_names='yes'
+            ;;
         --burn)
             burned_subtitle_track="$(printf '%.0f' "$2" 2>/dev/null)"
             shift
@@ -441,6 +468,12 @@ while [ "$1" ]; do
         --add-subtitle)
             extra_subtitle_tracks=("${extra_subtitle_tracks[@]}" "$2")
             shift
+
+            add_all_subtitles=''
+            ;;
+        --add-all-subtitles)
+            add_all_subtitles='yes'
+            extra_subtitle_tracks=()
             ;;
         --find-forced)
             find_forced="$2"
@@ -611,6 +644,36 @@ if ! $(which HandBrakeCLI >/dev/null); then
     die 'executable not in $PATH: HandBrakeCLI'
 fi
 
+readonly version="$(HandBrakeCLI --preset-list 2>&1)"
+
+if [ ! "$version" ]; then
+    die "can't determine HandBrakeCLI version"
+fi
+
+readonly release_version="$(echo "$version" |
+    sed -n 's/^HandBrake \([0-9]\{1,\}\)\.\([0-9]\{1,\}\)\.\([0-9]\{1,\}\) .*$/\1 \2 \3/p' |
+    sed 's/ 0\([0-9]\)/ \1/g')"
+
+if [ "$release_version" ]; then
+    readonly version_array=($release_version)
+
+    if ((((${version_array[0]} * 10) + ${version_array[1]}) < 10)); then
+        die 'HandBrake version 0.10.0 or later is required'
+    fi
+else
+    readonly svn_version="$(echo "$version" |
+        sed -n 's/^HandBrake svn\([0-9]\{1,\}\) .*$/\1/p')"
+
+    if [ "$svn_version" ]; then
+
+        if (($svn_version < 6536)); then
+            die 'HandBrake version 0.10.0 or later is required'
+        fi
+    else
+        die "can't determine HandBrakeCLI version"
+    fi
+fi
+
 if [ "$media_title" == '0' ]; then
     echo "Scanning: $input" >&2
 fi
@@ -669,6 +732,24 @@ fi
 width="${size_array[0]}"
 height="${size_array[1]}"
 
+if [ "$custom_width" ]; then
+
+    if [ "$custom_width" == "$width" ]; then
+        custom_width=''
+    else
+        width="$custom_width"
+    fi
+fi
+
+if [ "$custom_height" ]; then
+
+    if [ "$custom_height" == "$height" ]; then
+        custom_height=''
+    else
+        height="$custom_height"
+    fi
+fi
+
 if [ "$crop_values" != '0:0:0:0' ] && [ "$crop_values" != 'auto' ]; then
     readonly crop_array=($(echo "$crop_values" |
         sed -n 's/^\([0-9]\{1,\}\):\([0-9]\{1,\}\):\([0-9]\{1,\}\):\([0-9]\{1,\}\)$/ \1 \2 \3 \4 /p' |
@@ -683,7 +764,13 @@ if [ "$crop_values" != '0:0:0:0' ] && [ "$crop_values" != 'auto' ]; then
 fi
 
 if ((($width > $constrain_width)) || (($height > $constrain_height))); then
-    size_options="--maxWidth $constrain_width --maxHeight $constrain_height --loose-anamorphic"
+    size_options="--maxWidth $constrain_width --maxHeight $constrain_height"
+
+    if [ "$custom_width" ] || [ "$custom_height" ]; then
+        size_options="$size_options --custom-anamorphic"
+    else
+        size_options="$size_options --loose-anamorphic"
+    fi
 
     adjusted_height="$(ruby -e 'printf "%.0f", '$height' * ('$constrain_width'.0 / '$width')')"
     adjusted_height=$((adjusted_height - (adjusted_height % 2)))
@@ -696,8 +783,19 @@ if ((($width > $constrain_width)) || (($height > $constrain_height))); then
         width="$constrain_width"
         height="$adjusted_height"
     fi
+
+elif [ "$custom_width" ] || [ "$custom_height" ]; then
+    size_options='--custom-anamorphic'
 else
     size_options='--strict-anamorphic'
+fi
+
+if [ "$custom_height" ]; then
+    size_options="--height $height $size_options"
+fi
+
+if [ "$custom_width" ]; then
+    size_options="--width $width $size_options"
 fi
 
 # Limit `x264` video buffer verifier (VBV) size to values appropriate for
@@ -837,6 +935,15 @@ audio_bitrate_list=''
 audio_track_name_list=''
 audio_track_name_edits=()
 
+if [ "$copy_audio_names" ]; then
+    readonly all_audio_streams_info="$(echo "$media_info" |
+        sed -n '/^    Stream #[^:]\{1,\}: Audio: /,$p' |
+        sed '/^[^ ]\{1,\}.*$/,$d' |
+        sed '/^    Stream #[^:]\{1,\}: Subtitle: /,$d' |
+        sed '/^    Metadata:$/d' |
+        sed '$!N;s/\n/ /')"
+fi
+
 readonly all_audio_tracks_info="$(echo "$media_info" |
     sed -n '/^  + audio tracks:$/,/^  + subtitle tracks:$/p' |
     sed -n '/^    + /p')"
@@ -851,6 +958,18 @@ if [ "$audio_track_info" ]; then
     else
         aac_encoder='av_aac'
     fi
+
+    if [ "$copy_audio_names" ] && [ ! "$main_audio_track_name" ]; then
+        track_name="$(echo "$all_audio_streams_info" |
+            sed -n ${main_audio_track}p |
+            sed -n 's/^.* \{1,\}title \{1,\}: \(.*\)$/\1/p')"
+
+        if [ "$track_name" ]; then
+            main_audio_track_name="$track_name"
+        fi
+    fi
+
+    sanitized_name="$(echo "$main_audio_track_name" | sed 's/,/_/g')"
 
     surround_audio_encoder=''
     surround_audio_bitrate=''
@@ -877,7 +996,7 @@ if [ "$audio_track_info" ]; then
 
     if [ "$surround_audio_encoder" ] && [ ! "$single_main_audio" ]; then
         audio_track_list="$main_audio_track,$main_audio_track"
-        audio_track_name_list=','
+        audio_track_name_list="$sanitized_name,$sanitized_name"
 
         if [ "$container_format" == 'mkv' ]; then
             audio_encoder_list="$surround_audio_encoder,$stereo_audio_encoder"
@@ -887,10 +1006,14 @@ if [ "$audio_track_info" ]; then
             audio_bitrate_list=",$surround_audio_bitrate"
         fi
 
-        track_id='3'
+        if [ "$sanitized_name" != "$main_audio_track_name" ]; then
+            audio_track_name_edits=(1,"$main_audio_track_name" 2,"$main_audio_track_name")
+        fi
+
         track_index='3'
     else
         audio_track_list="$main_audio_track"
+        audio_track_name_list="$sanitized_name"
 
         if [ "$surround_audio_encoder" ]; then
             audio_encoder_list="$surround_audio_encoder"
@@ -899,8 +1022,25 @@ if [ "$audio_track_info" ]; then
             audio_encoder_list="$stereo_audio_encoder"
         fi
 
-        track_id='2'
+        if [ "$sanitized_name" != "$main_audio_track_name" ]; then
+            audio_track_name_edits=(1,"$main_audio_track_name")
+        fi
+
         track_index='2'
+    fi
+
+    if [ "$add_all_audio" ]; then
+
+        if [ "$add_all_audio" == 'double' ]; then
+            width_prefix="$add_all_audio,"
+        else
+            width_prefix=''
+        fi
+
+        while read line; do
+            extra_audio_tracks=("${extra_audio_tracks[@]}" "$width_prefix$(echo "$line" | sed -n 's/^+ \([0-9]\{1,\}\), .*$/\1/p')")
+
+        done < <(echo "$all_audio_tracks_info" | sed ${main_audio_track}d)
     fi
 
     for item in "${extra_audio_tracks[@]}"; do
@@ -926,6 +1066,11 @@ if [ "$audio_track_info" ]; then
 
         if [[ "$item" =~ ',' ]]; then
             track_name="$(echo "$item" | sed 's/^[^,]*,//')"
+
+        elif [ "$copy_audio_names" ]; then
+            track_name="$(echo "$all_audio_streams_info" |
+                sed -n ${track_number}p |
+                sed -n 's/^.* \{1,\}title \{1,\}: \(.*\)$/\1/p')"
         else
             track_name=''
         fi
@@ -968,15 +1113,9 @@ if [ "$audio_track_info" ]; then
             fi
 
             if [ "$sanitized_name" != "$track_name" ]; then
-
-                if [ "$container_format" == 'mkv' ]; then
-                    audio_track_name_edits=("${audio_track_name_edits[@]}" "$track_id,$track_name" "$((track_id + 1)),$track_name")
-                else
-                    audio_track_name_edits=("${audio_track_name_edits[@]}" "$track_index,$track_name" "$((track_index + 1)),$track_name")
-                fi
+                audio_track_name_edits=("${audio_track_name_edits[@]}" "$track_index,$track_name" "$((track_index + 1)),$track_name")
             fi
 
-            track_id="$((track_id + 2))"
             track_index="$((track_index + 2))"
         else
             audio_track_list="$audio_track_list,$track_number"
@@ -991,15 +1130,9 @@ if [ "$audio_track_info" ]; then
             fi
 
             if [ "$sanitized_name" != "$track_name" ]; then
-
-                if [ "$container_format" == 'mkv' ]; then
-                    audio_track_name_edits=("${audio_track_name_edits[@]}" "$track_id,$track_name")
-                else
-                    audio_track_name_edits=("${audio_track_name_edits[@]}" "$track_index,$track_name")
-                fi
+                audio_track_name_edits=("${audio_track_name_edits[@]}" "$track_index,$track_name")
             fi
 
-            track_id="$((track_id + 1))"
             track_index="$((track_index + 1))"
         fi
     done
@@ -1066,7 +1199,21 @@ elif [ "$find_forced" ]; then
 
 fi
 
-forced_subtitle_track_id=''
+if [ "$add_all_subtitles" ]; then
+
+    if [ "$burned_subtitle_track" ]; then
+        tracks_info="$(echo "$all_subtitle_tracks_info" | sed ${burned_subtitle_track}d)"
+    else
+        tracks_info="$all_subtitle_tracks_info"
+    fi
+
+    while read line; do
+        extra_subtitle_tracks=("${extra_subtitle_tracks[@]}" "$(echo "$line" | sed -n 's/^+ \([0-9]\{1,\}\), .*$/\1/p')")
+
+    done < <(echo "$tracks_info")
+fi
+
+forced_subtitle_track_number=''
 track_id='1'
 
 for item in "${extra_subtitle_tracks[@]}"; do
@@ -1099,9 +1246,9 @@ for item in "${extra_subtitle_tracks[@]}"; do
         fi
 
         if [ "$container_format" == 'mkv' ]; then
-            forced_subtitle_track_id="$track_id"
+            forced_subtitle_track_number="$track_id"
         else
-            forced_subtitle_track_id="$track_index"
+            forced_subtitle_track_number="$track_index"
         fi
     fi
 
@@ -1199,9 +1346,9 @@ for item in "${extra_srt_files[@]}"; do
             if [ ! "$find_forced" ]; then
 
                 if [ "$container_format" == 'mkv' ]; then
-                    forced_subtitle_track_id="$track_id"
+                    forced_subtitle_track_number="$track_id"
                 else
-                    forced_subtitle_track_id="$track_index"
+                    forced_subtitle_track_number="$track_index"
                 fi
             fi
 
@@ -1375,23 +1522,23 @@ if [ "$debug" ]; then
     echo "$command"
 
     for item in "${audio_track_name_edits[@]}"; do
-        track_id="$(echo "$item" | sed 's/,.*$//')"
+        track_index="$(echo "$item" | sed 's/,.*$//')"
         track_name="$(echo "$item" | sed 's/^[^,]*,//')"
 
         if [ "$container_format" == 'mkv' ]; then
-            echo "[ -f $(escape_string "$output") ] && mkvpropedit --quiet --edit track:a$track_id --set name=$(escape_string "$track_name") $(escape_string "$output")"
+            echo "[ -f $(escape_string "$output") ] && mkvpropedit --quiet --edit track:a$track_index --set name=$(escape_string "$track_name") $(escape_string "$output")"
         else
-            echo "[ -f $(escape_string "$output") ] && mp4track --track-index $track_id --hdlrname $(escape_string "$track_name") $(escape_string "$output")"
-            echo "[ -f $(escape_string "$output") ] && mp4track --track-index $track_id --udtaname $(escape_string "$track_name") $(escape_string "$output")"
+            echo "[ -f $(escape_string "$output") ] && mp4track --track-index $track_index --hdlrname $(escape_string "$track_name") $(escape_string "$output")"
+            echo "[ -f $(escape_string "$output") ] && mp4track --track-index $track_index --udtaname $(escape_string "$track_name") $(escape_string "$output")"
         fi
     done
 
-    if [ "$forced_subtitle_track_id" ]; then
+    if [ "$forced_subtitle_track_number" ]; then
 
         if [ "$container_format" == 'mkv' ]; then
-            echo "[ -f $(escape_string "$output") ] && mkvpropedit --quiet --edit track:s$forced_subtitle_track_id --set flag-default=1 --set flag-forced=1 $(escape_string "$output")"
+            echo "[ -f $(escape_string "$output") ] && mkvpropedit --quiet --edit track:s$forced_subtitle_track_number --set flag-default=1 --set flag-forced=1 $(escape_string "$output")"
         else
-            echo "[ -f $(escape_string "$output") ] && mp4track --track-index $forced_subtitle_track_id --enabled true $(escape_string "$output")"
+            echo "[ -f $(escape_string "$output") ] && mp4track --track-index $forced_subtitle_track_number --enabled true $(escape_string "$output")"
         fi
 
     elif [ "$find_forced" == 'add' ] && [ "$container_format" == 'mkv' ]; then
@@ -1417,7 +1564,7 @@ else
     tool='mp4track'
 fi
 
-if ( ((${#audio_track_name_edits[*]} > 0)) || [ "$forced_subtitle_track_id" ] ) && ! $(which $tool >/dev/null); then
+if ( ((${#audio_track_name_edits[*]} > 0)) || [ "$forced_subtitle_track_number" ] ) && ! $(which $tool >/dev/null); then
     die "executable not in \$PATH: $tool"
 fi
 
@@ -1455,23 +1602,23 @@ time {
     if [ -f "$output" ]; then
 
         for item in "${audio_track_name_edits[@]}"; do
-            track_id="$(echo "$item" | sed 's/,.*$//')"
+            track_index="$(echo "$item" | sed 's/,.*$//')"
             track_name="$(echo "$item" | sed 's/^[^,]*,//')"
 
             if [ "$container_format" == 'mkv' ]; then
-                mkvpropedit --quiet --edit track:a$track_id --set name="$track_name" "$output" || exit 1
+                mkvpropedit --quiet --edit track:a$track_index --set name="$track_name" "$output" || exit 1
             else
-                mp4track --track-index $track_id --hdlrname "$track_name" "$output" &&
-                mp4track --track-index $track_id --udtaname "$track_name" "$output" || exit 1
+                mp4track --track-index $track_index --hdlrname "$track_name" "$output" &&
+                mp4track --track-index $track_index --udtaname "$track_name" "$output" || exit 1
             fi
         done
 
-        if [ "$forced_subtitle_track_id" ]; then
+        if [ "$forced_subtitle_track_number" ]; then
 
             if [ "$container_format" == 'mkv' ]; then
-                mkvpropedit --quiet --edit track:s$forced_subtitle_track_id --set flag-default=1 --set flag-forced=1 "$output" || exit 1
+                mkvpropedit --quiet --edit track:s$forced_subtitle_track_number --set flag-default=1 --set flag-forced=1 "$output" || exit 1
             else
-                mp4track --track-index $forced_subtitle_track_id --enabled true "$output" || exit 1
+                mp4track --track-index $forced_subtitle_track_number --enabled true "$output" || exit 1
             fi
 
         elif [ "$find_forced" == 'add' ] && [ "$container_format" == 'mkv' ] && [ "$(mkvmerge --identify-verbose "$output" 2>/dev/null | sed -n '/^Track ID [0-9]\{1,\}: subtitles .* default_track:1 .*$/p')" ]; then
