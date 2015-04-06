@@ -846,10 +846,17 @@ elif [ -f "$input" ]; then
         sed 's/ 0/ /g'))
 
     if ((${#duration_array[*]} == 3)); then
+        # Support GNU and BSD stat
+        $(stat --version |grep -q GNU)
+        if [ $? -eq 0 ]; then
+            stat_cmd="stat -L -c %s"
+        else
+            stat_cmd="stat -L -f %z"
+        fi
         # Calculate total bitrate from file size in bits divided by video
         # duration in seconds.
         #
-        bitrate="$((($(stat -L -f %z "$input") * 8) / ((duration_array[0] * 60 * 60) + (duration_array[1] * 60) + duration_array[2])))"
+        bitrate="$((($($stat_cmd "$input") * 8) / ((duration_array[0] * 60 * 60) + (duration_array[1] * 60) + duration_array[2])))"
 
         if [ "$bitrate" ]; then
             # Convert to kbps and round to nearest thousand.
