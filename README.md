@@ -213,10 +213,6 @@ Use `--help` to understand how to override their default behavior with other opt
 
     transcode-video.sh --help
 
-Use `--fullhelp` to see more than just basic options for `transcode-video.sh`:
-
-    transcode-video.sh --fullhelp
-
 This built-in help is available even if a script's software dependencies are not yet installed.
 
 While `transcode-video.sh` and `detect-crop.sh` work best with a single video file, both also accept a disc image directory as input:
