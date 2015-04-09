@@ -7,7 +7,7 @@
 
 about() {
     cat <<EOF
-$program 5.12 of March 6, 2015
+$program 5.13 of April 8, 2015
 Copyright (c) 2013-2015 Don Melton
 EOF
     exit 0
@@ -57,8 +57,8 @@ Video options:
     --720p          constrain video to fit within 1280x720 pixel bounds
     --1080p             "       "   "   "    "    1920x1080  "     "
     --2160p             "       "   "   "    "    3840x2160  "     "
-    --width         change pixel aspect ratio with custom width
-    --height          "      "     "      "    "     "    height
+    --width WIDTH   change pixel aspect ratio with custom width
+    --height HEIGHT   "      "     "      "    "     "    height
     --rate FPS[,limited]
                     set video frame rate with optional peak-limited flag
                         (default: based on input)
@@ -846,10 +846,17 @@ elif [ -f "$input" ]; then
         sed 's/ 0/ /g'))
 
     if ((${#duration_array[*]} == 3)); then
+
+        if $(stat --version 2>/dev/null | grep -q 'GNU'); then
+            format_option='-c %s'
+        else
+            format_option='-f %z'
+        fi
+
         # Calculate total bitrate from file size in bits divided by video
         # duration in seconds.
         #
-        bitrate="$((($(stat -L -f %z "$input") * 8) / ((duration_array[0] * 60 * 60) + (duration_array[1] * 60) + duration_array[2])))"
+        bitrate="$((($(stat -L $format_option "$input") * 8) / ((duration_array[0] * 60 * 60) + (duration_array[1] * 60) + duration_array[2])))"
 
         if [ "$bitrate" ]; then
             # Convert to kbps and round to nearest thousand.
