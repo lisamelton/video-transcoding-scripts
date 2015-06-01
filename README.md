@@ -10,6 +10,10 @@ While I've used rougher versions of these scripts for many years, I didn't publi
 
 <https://github.com/donmelton/video-transcoding-scripts>
 
+This repo's scripts are no longer the latest available. The new version is written in Ruby, largely overhauled and available at:
+
+<https://github.com/donmelton/video_transcoding>
+
 All of these scripts are written in [Bash](http://www.gnu.org/software/bash/) and leverage excellent Open Source and cross-platform software like [HandBrake](https://handbrake.fr/), [MKVToolNix](https://www.bunkus.org/videotools/mkvtoolnix/), [MPlayer](http://mplayerhq.hu/), [FFmpeg](http://ffmpeg.org/), and [MP4v2](https://code.google.com/p/mp4v2/). These scripts are essentially intelligent wrappers around these other tools, designed to be executed from the command line shell.
 
 Even if you don't use any of these scripts, you may find their source code or this "README" document helpful.
