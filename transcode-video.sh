@@ -206,6 +206,7 @@ case $1 in
         ;;
 esac
 
+check_handbrake_version='1'
 media_title='1'
 section_options=''
 output=''
@@ -610,6 +611,9 @@ while [ "$1" ]; do
         --no-auto-detelecine)
             deprecated "$1"
             ;;
+        --no-check-handbrake-version)
+            check_handbrake_version=''
+            ;;
         --srt-burn)
             deprecated "$1"
             srt_number="$(printf '%.0f' "$2" 2>/dev/null)"
@@ -644,34 +648,38 @@ if ! $(which HandBrakeCLI >/dev/null); then
     die 'executable not in $PATH: HandBrakeCLI'
 fi
 
-readonly version="$(HandBrakeCLI --preset-list 2>&1)"
+if [ "$check_handbrake_version" ]; then
 
-if [ ! "$version" ]; then
-    die "can't determine HandBrakeCLI version"
-fi
+    readonly version="$(HandBrakeCLI --preset-list 2>&1)"
 
-readonly release_version="$(echo "$version" |
-    sed -n 's/^HandBrake \([0-9]\{1,\}\)\.\([0-9]\{1,\}\)\.\([0-9]\{1,\}\) .*$/\1 \2 \3/p' |
-    sed 's/ 0\([0-9]\)/ \1/g')"
-
-if [ "$release_version" ]; then
-    readonly version_array=($release_version)
-
-    if ((((${version_array[0]} * 10) + ${version_array[1]}) < 10)); then
-        die 'HandBrake version 0.10.0 or later is required'
+    if [ ! "$version" ]; then
+        die "can't determine HandBrakeCLI version"
     fi
-else
-    readonly svn_version="$(echo "$version" |
-        sed -n 's/^HandBrake svn\([0-9]\{1,\}\) .*$/\1/p')"
 
-    if [ "$svn_version" ]; then
+    readonly release_version="$(echo "$version" |
+        sed -n 's/^HandBrake \([0-9]\{1,\}\)\.\([0-9]\{1,\}\)\.\([0-9]\{1,\}\) .*$/\1 \2 \3/p' |
+        sed 's/ 0\([0-9]\)/ \1/g')"
 
-        if (($svn_version < 6536)); then
+    if [ "$release_version" ]; then
+        readonly version_array=($release_version)
+
+        if ((((${version_array[0]} * 10) + ${version_array[1]}) < 10)); then
             die 'HandBrake version 0.10.0 or later is required'
         fi
     else
-        die "can't determine HandBrakeCLI version"
+        readonly svn_version="$(echo "$version" |
+            sed -n 's/^HandBrake svn\([0-9]\{1,\}\) .*$/\1/p')"
+
+        if [ "$svn_version" ]; then
+
+            if (($svn_version < 6536)); then
+                die 'HandBrake version 0.10.0 or later is required'
+            fi
+        else
+            die "can't determine HandBrakeCLI version"
+        fi
     fi
+
 fi
 
 if [ "$media_title" == '0' ]; then
