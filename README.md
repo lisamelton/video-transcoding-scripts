@@ -1,3 +1,13 @@
+# WARNING!
+
+**These old Bash scripts are now deprecated and no longer maintained!**
+
+**Instead, use my new and improved Ruby-based tools available at:**
+
+**<https://github.com/donmelton/video_transcoding>**
+
+<br /><br /><br /><br /><br />
+
 # Video Transcoding Scripts
 
 Utilities to transcode, inspect and convert videos.
