@@ -2,13 +2,13 @@
 #
 # query-handbrake-log.sh
 #
-# Copyright (c) 2014 Don Melton
+# Copyright (c) 2014-2024 Lisa Melton
 #
 
 about() {
     cat <<EOF
 $program 1.0 of November 21, 2014
-Copyright (c) 2014 Don Melton
+Copyright (c) 2014-2024 Lisa Melton
 EOF
     exit 0
 }

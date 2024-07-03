@@ -2,13 +2,13 @@
 #
 # convert-video.sh
 #
-# Copyright (c) 2013-2014 Don Melton
+# Copyright (c) 2013-2024 Lisa Melton
 #
 
 about() {
     cat <<EOF
 $program 2.0 of December 3, 2014
-Copyright (c) 2013-2014 Don Melton
+Copyright (c) 2013-2024 Lisa Melton
 EOF
     exit 0
 }

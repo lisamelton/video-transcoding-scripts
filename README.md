@@ -4,7 +4,11 @@
 
 **Instead, use my new and improved Ruby-based tools available at:**
 
-**<https://github.com/donmelton/video_transcoding>**
+**<https://github.com/lisamelton/video_transcoding>**
+
+**<https://github.com/lisamelton/other_video_transcoding>**
+
+**<https://github.com/lisamelton/more-video-transcoding>**
 
 <br /><br /><br /><br /><br />
 
@@ -14,11 +18,11 @@ Utilities to transcode, inspect and convert videos.
 
 ## About
 
-Hi, I'm [Don Melton](http://donmelton.com/). I wrote these scripts to transcode my collection of Blu-ray Discs and DVDs into a smaller, more portable format while remaining high enough quality to be mistaken for the originals.
+Hi, I'm [Lisa Melton](http://lisamelton.net/). I wrote these scripts to transcode my collection of Blu-ray Discs and DVDs into a smaller, more portable format while remaining high enough quality to be mistaken for the originals.
 
 While I've used rougher versions of these scripts for many years, I didn't publish any of them until I was featured in, "[How to rip and transcode video for the best quality possible](http://www.imore.com/vector-22-don-melton-transcoding-video)," a podcast with [Rene Ritchie](https://twitter.com/reneritchie). Those initial scripts were only available as separate Gists on GitHub. Now they're all collected in this repository:
 
-<https://github.com/donmelton/video-transcoding-scripts>
+<https://github.com/lisamelton/video-transcoding-scripts>
 
 All of these scripts are written in [Bash](http://www.gnu.org/software/bash/) and leverage excellent Open Source and cross-platform software like [HandBrake](https://handbrake.fr/), [MKVToolNix](https://www.bunkus.org/videotools/mkvtoolnix/), [MPlayer](http://mplayerhq.hu/), [FFmpeg](http://ffmpeg.org/), and [MP4v2](https://code.google.com/p/mp4v2/). These scripts are essentially intelligent wrappers around these other tools, designed to be executed from the command line shell.
 
@@ -201,11 +205,11 @@ As of now, all of my scripts must be installed manually.
 
 You can retrieve them via the command line by cloning the entire repository like this:
 
-    git clone https://github.com/donmelton/video-transcoding-scripts.git
+    git clone https://github.com/lisamelton/video-transcoding-scripts.git
 
 Or download them individually from the GitHub website here:
 
-<https://github.com/donmelton/video-transcoding-scripts>
+<https://github.com/lisamelton/video-transcoding-scripts>
 
 Make sure each script is executable by setting its permissions like this:
 
@@ -566,7 +570,7 @@ The path is first deleted from the `queue.txt` file and then passed as an argume
 
 ## Feedback
 
-The best way to send feedback is mentioning me, [@donmelton](https://twitter.com/donmelton), on Twitter. I always try to respond quickly but sometimes it may take as long as 24 hours.
+The best way to send feedback is mentioning me, [@lisamelton@mastodon.social](https://mastodon.social/@lisamelton), on Mastodon. I always try to respond quickly but sometimes it may take as long as 24 hours.
 
 ## Acknowledgements
 
@@ -580,4 +584,4 @@ Many thanks to [Jordan Breeding](https://twitter.com/jorbsd) and numerous others
 
 ## License
 
-Video Transcoding Scripts is copyright [Don Melton](http://donmelton.com/) and available under a [MIT license](https://github.com/donmelton/video-transcoding-scripts/blob/master/LICENSE).
+Video Transcoding Scripts is copyright [Lisa Melton](http://lisamelton.net/) and available under a [MIT license](https://github.com/lisamelton/video-transcoding-scripts/blob/master/LICENSE).

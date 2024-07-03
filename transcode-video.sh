@@ -2,13 +2,13 @@
 #
 # transcode-video.sh
 #
-# Copyright (c) 2013-2015 Don Melton
+# Copyright (c) 2013-2024 Lisa Melton
 #
 
 about() {
     cat <<EOF
 $program 5.13 of April 8, 2015
-Copyright (c) 2013-2015 Don Melton
+Copyright (c) 2013-2024 Lisa Melton
 EOF
     exit 0
 }
